@@ -5,21 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sobre mí</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
-    <script src="https://ka-f.fontawesome.com/releases/v5.15.4/css/free.min.css" crossorigin="anonymous"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <script src="https://kit.fontawesome.com/15fd5b60e4.js" crossorigin="anonymous"></script>
     <style>
         body {
-            font-family: 'Inter', sans-serif;
             margin: 0;
             padding: 0;
+            font-family: 'Inter', sans-serif;
             background-color: #121212;
             color: white;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
+            overflow: hidden;
         }
+
+        canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: -1;
+        }
+
         .container {
             display: flex;
             flex-wrap: wrap;
@@ -27,7 +31,10 @@
             max-width: 1200px;
             justify-content: center;
             padding: 20px;
+            margin-top: 40px;
+            animation: fadeIn 1.2s ease-in-out;
         }
+
         .card {
             background: #1e1e1e;
             padding: 20px;
@@ -37,22 +44,33 @@
             max-width: 350px;
             text-align: center;
             transition: transform 0.3s ease, box-shadow 0.3s ease;
+            animation: slideUp 0.8s ease forwards;
+            opacity: 0;
         }
+
+        .card:nth-child(1) { animation-delay: 0.2s; }
+        .card:nth-child(2) { animation-delay: 0.4s; }
+        .card:nth-child(3) { animation-delay: 0.6s; }
+        .card:nth-child(4) { animation-delay: 0.8s; }
+
         .card:hover {
             transform: translateY(-5px);
             box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
         }
+
         .perfil {
             background: linear-gradient(135deg, #2c3e50, #4a69bd);
             color: white;
         }
+
         .social-container {
             display: flex;
             flex-wrap: wrap;
             gap: 15px;
             justify-content: center;
-            margin-top: 20px;
+            margin: 30px 0;
         }
+
         .social-card {
             background: #0077b5;
             color: white;
@@ -67,12 +85,25 @@
             align-items: center;
             gap: 10px;
         }
+
         .social-card i {
             font-size: 24px;
         }
+
         .social-card:hover {
             transform: scale(1.1);
         }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
         @media (max-width: 768px) {
             .container {
                 flex-direction: column;
@@ -86,6 +117,7 @@
     </style>
 </head>
 <body>
+    <canvas id="bgCanvas"></canvas>
     <div class="container">
         <div class="card perfil">
             <h2>Ezequiel Ponce</h2>
@@ -109,7 +141,64 @@
         <a href="https://x.com/ezefix_" class="social-card" style="background: #1da1f2;"><i class="fab fa-twitter"></i> Twitter/X</a>
         <a href="https://instagram.com/ezekqz" class="social-card" style="background: #e4405f;"><i class="fab fa-instagram"></i> Instagram</a>
         <a href="https://www.facebook.com/profile.php?id=100064691665445" class="social-card" style="background: #1877f2;"><i class="fab fa-facebook"></i> Facebook</a>
-        <a href="https://letterboxd.com/ezekqz/" class="social-card" style="background: #e3530b;"><i class="fab fa-instagram"></i> Letterboxd</a>
+        <a href="https://letterboxd.com/ezekqz/" class="social-card" style="background: #e3530b;"><i class="fab fa-film"></i> Letterboxd</a>
     </div>
+
+    <script>
+        // Fondo animado de partículas estilo videojuego
+        const canvas = document.getElementById('bgCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let particlesArray = [];
+
+        class Particle {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.size = Math.random() * 3 + 1;
+                this.speedX = Math.random() * 1 - 0.5;
+                this.speedY = Math.random() * 1 - 0.5;
+            }
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                if (this.x < 0 || this.x > canvas.width) this.speedX *= -1;
+                if (this.y < 0 || this.y > canvas.height) this.speedY *= -1;
+            }
+            draw() {
+                ctx.fillStyle = '#00ffff';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function init() {
+            particlesArray = [];
+            for (let i = 0; i < 100; i++) {
+                particlesArray.push(new Particle());
+            }
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let i = 0; i < particlesArray.length; i++) {
+                particlesArray[i].update();
+                particlesArray[i].draw();
+            }
+            requestAnimationFrame(animate);
+        }
+
+        init();
+        animate();
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            init();
+        });
+    </script>
 </body>
 </html>

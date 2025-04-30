@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Reproductor de PDF a Voz</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #1e1e1e;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+    }
+
+    .player {
+      background: #2c2c2c;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 0 15px rgba(0,0,0,0.5);
+      width: 90%;
+      max-width: 400px;
+      text-align: center;
+    }
+
+    .controls button {
+      background: #4caf50;
+      border: none;
+      padding: 10px 20px;
+      margin: 10px 5px;
+      color: white;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    .controls button:hover {
+      background: #45a049;
+    }
+
+    .progress {
+      background: #444;
+      border-radius: 5px;
+      height: 10px;
+      width: 100%;
+      margin: 15px 0;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      background: #4caf50;
+      height: 100%;
+      width: 0%;
+      transition: width 0.3s;
+    }
+
+    input[type="file"] {
+      margin: 15px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="player">
+    <h2>Lectura de PDF en Voz</h2>
+    <input type="file" id="upload" accept="application/pdf">
+    
+    <div class="controls">
+      <button onclick="playReading()">▶ Play</button>
+      <button onclick="pauseReading()">⏸ Pausa</button>
+      <button onclick="stopReading()">⏹ Detener</button>
+    </div>
+
+    <div class="progress">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+    <p id="status">Esperando PDF...</p>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.14.305/pdf.min.js"></script>
+  <script>
+    let pdfText = '';
+    let chunks = [];
+    let index = 0;
+    let utterance = null;
+    let isPaused = false;
+    let spanishVoice = null;
+    let loopStartTime = null;
+    const LOOP_DURATION = 3 * 60 * 60 * 1000; // 3 horas
+
+    function loadVoices(callback) {
+      let voices = speechSynthesis.getVoices();
+      if (voices.length !== 0) {
+        spanishVoice = voices.find(v => v.lang.startsWith('es'));
+        if (spanishVoice) {
+          callback();
+        } else {
+          alert("No se encontró una voz en español. Revisá la configuración de tu navegador o sistema.");
+        }
+      } else {
+        setTimeout(() => loadVoices(callback), 200);
+      }
+    }
+
+    window.speechSynthesis.onvoiceschanged = () => {
+      loadVoices(() => {
+        console.log("Voz en español cargada:", spanishVoice.name);
+      });
+    };
+
+    document.getElementById('upload').addEventListener('change', async function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = async function() {
+        const typedarray = new Uint8Array(this.result);
+        const pdf = await pdfjsLib.getDocument(typedarray).promise;
+        pdfText = '';
+
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const textContent = await page.getTextContent();
+          const text = textContent.items.map(item => item.str).join(' ');
+          pdfText += text + ' ';
+        }
+
+        chunks = pdfText.match(/[\s\S]{1,500}[\.\!\?]*/g);
+        document.getElementById('status').innerText = 'PDF cargado. Listo para reproducir.';
+      };
+      reader.readAsArrayBuffer(file);
+    });
+
+    function playReading() {
+      if (!chunks.length) return alert("Primero subí un PDF.");
+
+      if (!spanishVoice) {
+        loadVoices(() => playReading());
+        return;
+      }
+
+      if (isPaused && utterance) {
+        speechSynthesis.resume();
+        isPaused = false;
+        document.getElementById('status').innerText = 'Reproduciendo...';
+        return;
+      }
+
+      if (index >= chunks.length) index = 0;
+
+      utterance = new SpeechSynthesisUtterance();
+      utterance.voice = spanishVoice;
+      utterance.lang = spanishVoice.lang;
+      utterance.rate = 0.8; // velocidad más rápida
+      utterance.pitch = 1;
+
+      utterance.onend = function () {
+        index++;
+        updateProgress();
+
+        if (!loopStartTime) loopStartTime = Date.now();
+
+        if (index < chunks.length) {
+          playReading();
+        } else {
+          const elapsed = Date.now() - loopStartTime;
+          if (elapsed < LOOP_DURATION) {
+            index = 0;
+            updateProgress();
+            playReading();
+          } else {
+            document.getElementById('status').innerText = 'Lectura finalizada tras 3 horas.';
+          }
+        }
+      };
+
+      utterance.text = chunks[index];
+      speechSynthesis.speak(utterance);
+      document.getElementById('status').innerText = 'Reproduciendo...';
+    }
+
+    function pauseReading() {
+      speechSynthesis.pause();
+      isPaused = true;
+      document.getElementById('status').innerText = 'Pausado';
+    }
+
+    function stopReading() {
+      speechSynthesis.cancel();
+      index = 0;
+      isPaused = false;
+      loopStartTime = null;
+      document.getElementById('status').innerText = 'Lectura detenida.';
+      document.getElementById('progressBar').style.width = '0%';
+    }
+
+    function updateProgress() {
+      const percent = (index / chunks.length) * 100;
+      document.getElementById('progressBar').style.width = percent + '%';
+    }
+  </script>
+</body>
+</html>

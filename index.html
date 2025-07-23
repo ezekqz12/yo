@@ -3,202 +3,79 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sobre mí</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
-    <script src="https://kit.fontawesome.com/15fd5b60e4.js" crossorigin="anonymous"></script>
+    <title>Desarrollador Web | Estudiante de Abogacía</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <style>
         body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
             margin: 0;
             padding: 0;
-            font-family: 'Inter', sans-serif;
-            background-color: #121212;
-            color: white;
-            overflow: hidden;
-        }
-
-        canvas {
-            position: fixed;
-            top: 0;
-            left: 0;
-            z-index: -1;
-        }
-
-        .container {
+            background-color: #f0f2f5; /* Un gris más suave */
+            color: #333;
             display: flex;
-            flex-wrap: wrap;
-            gap: 20px;
-            max-width: 1200px;
             justify-content: center;
-            padding: 20px;
-            margin-top: 40px;
-            animation: fadeIn 1.2s ease-in-out;
-        }
-
-        .card {
-            background: #1e1e1e;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
-            min-width: 280px;
-            max-width: 350px;
-            text-align: center;
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-            animation: slideUp 0.8s ease forwards;
-            opacity: 0;
-        }
-
-        .card:nth-child(1) { animation-delay: 0.2s; }
-        .card:nth-child(2) { animation-delay: 0.4s; }
-        .card:nth-child(3) { animation-delay: 0.6s; }
-        .card:nth-child(4) { animation-delay: 0.8s; }
-
-        .card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
-        }
-
-        .perfil {
-            background: linear-gradient(135deg, #2c3e50, #4a69bd);
-            color: white;
-        }
-
-        .social-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 15px;
-            justify-content: center;
-            margin: 30px 0;
-        }
-
-        .social-card {
-            background: #0077b5;
-            color: white;
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-            cursor: pointer;
-            text-decoration: none;
-            font-weight: bold;
-            transition: transform 0.3s ease;
-            display: flex;
             align-items: center;
-            gap: 10px;
+            min-height: 100vh; /* Asegura que ocupe toda la altura de la ventana */
         }
-
-        .social-card i {
-            font-size: 24px;
+        .container {
+            max-width: 700px; /* Un poco más estrecho para minimalismo */
+            margin: 20px auto;
+            padding: 30px;
+            background: #fff;
+            border-radius: 12px; /* Bordes más redondeados */
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); /* Sombra más sutil */
+            text-align: center;
         }
-
-        .social-card:hover {
-            transform: scale(1.1);
+        h1 {
+            color: #2c3e50; /* Un azul oscuro elegante */
+            margin-bottom: 15px;
+            font-size: 2.2em; /* Título un poco más grande */
         }
-
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
+        p {
+            margin-bottom: 15px;
+            font-size: 1.1em; /* Texto un poco más grande */
+            color: #555;
         }
-
-        @keyframes slideUp {
-            from { transform: translateY(20px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
+        .social-links {
+            margin-top: 30px;
+            display: flex; /* Para centrar los iconos */
+            justify-content: center;
+            gap: 25px; /* Espacio entre iconos */
         }
-
-        @media (max-width: 768px) {
-            .container {
-                flex-direction: column;
-                align-items: center;
-            }
-            .social-container {
-                flex-direction: column;
-                align-items: center;
-            }
+        .social-links a {
+            color: #3498db; /* Azul vibrante para los iconos */
+            font-size: 2.5em; /* Tamaño de los iconos */
+            text-decoration: none; /* Sin subrayado */
+            transition: color 0.3s ease-in-out, transform 0.3s ease-in-out; /* Transición suave */
+        }
+        .social-links a:hover {
+            color: #2980b9; /* Color al pasar el ratón */
+            transform: translateY(-3px); /* Pequeño efecto al pasar el ratón */
+        }
+        .footer {
+            margin-top: 40px;
+            font-size: 0.85em;
+            color: #777;
+            border-top: 1px solid #eee; /* Línea sutil en el pie de página */
+            padding-top: 20px;
         }
     </style>
 </head>
 <body>
-    <canvas id="bgCanvas"></canvas>
     <div class="container">
-        <div class="card perfil">
-            <h2>Ezequiel Ponce</h2>
-            <p>Estudiante de Abogacía</p>
-        </div>
-        <div class="card">
-            <h2>Sobre Mí</h2>
-            <p>Me llamo Ezequiel Ponce, tengo 21 años, vivo en la provincia de Mendoza y me encanta la tecnología, también el derecho y muchos otros temas más. Actualmente, y por problemas ajenos, estoy alejado de la programación y me encuentro estudiando abogacía.</p>
-        </div>
-        <div class="card">
-            <h2>Educación</h2>
-            <p><strong>Facultad de Ciencias Políticas UNCuyo</strong> - 2023-2024</p>
-            <p><strong>Facultad del Aconcagua - Abogacía</strong> (actualmente)</p>
-        </div>
-        <div class="card">
-            <h2>Ubicación</h2>
-            <p>Mendoza, Argentina</p>
+        <h1>Hola, soy Ezequiel</h1>
+        <p>Soy programador web. Actualmente, estoy ampliando mi horizonte profesional estudiando Abogacía en la Universidad del Aconcagua.</p>
+        <p>Esta doble formación me permite fusionar la lógica de la programación con el pensamiento crítico legal, creando soluciones innovadoras desde múltiples perspectivas.</p>
+
+        <div class="social-links">
+            <a href="https://x.com/ezefix_" target="_blank" aria-label="Twitter/X"><i class="fab fa-x-twitter"></i></a>
+            <a href="https://instagram.com/ezekz" target="_blank" aria-label="Instagram"><i class="fab fa-instagram"></i></a>
+            </div>
+
+        <div class="footer">
+            <p>&copy; 2025. Todos los derechos reservados.</p>
         </div>
     </div>
-    <div class="social-container">
-        <a href="https://x.com/ezefix_" class="social-card" style="background: #1da1f2;"><i class="fab fa-twitter"></i> Twitter/X</a>
-        <a href="https://instagram.com/ezekqz" class="social-card" style="background: #e4405f;"><i class="fab fa-instagram"></i> Instagram</a>
-        <a href="https://www.facebook.com/profile.php?id=100064691665445" class="social-card" style="background: #1877f2;"><i class="fab fa-facebook"></i> Facebook</a>
-        <a href="https://letterboxd.com/ezekqz/" class="social-card" style="background: #e3530b;"><i class="fab fa-film"></i> Letterboxd</a>
-    </div>
-
-    <script>
-        // Fondo animado de partículas estilo videojuego
-        const canvas = document.getElementById('bgCanvas');
-        const ctx = canvas.getContext('2d');
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-
-        let particlesArray = [];
-
-        class Particle {
-            constructor() {
-                this.x = Math.random() * canvas.width;
-                this.y = Math.random() * canvas.height;
-                this.size = Math.random() * 3 + 1;
-                this.speedX = Math.random() * 1 - 0.5;
-                this.speedY = Math.random() * 1 - 0.5;
-            }
-            update() {
-                this.x += this.speedX;
-                this.y += this.speedY;
-                if (this.x < 0 || this.x > canvas.width) this.speedX *= -1;
-                if (this.y < 0 || this.y > canvas.height) this.speedY *= -1;
-            }
-            draw() {
-                ctx.fillStyle = '#00ffff';
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-                ctx.fill();
-            }
-        }
-
-        function init() {
-            particlesArray = [];
-            for (let i = 0; i < 100; i++) {
-                particlesArray.push(new Particle());
-            }
-        }
-
-        function animate() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            for (let i = 0; i < particlesArray.length; i++) {
-                particlesArray[i].update();
-                particlesArray[i].draw();
-            }
-            requestAnimationFrame(animate);
-        }
-
-        init();
-        animate();
-
-        window.addEventListener('resize', () => {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-            init();
-        });
-    </script>
 </body>
 </html>

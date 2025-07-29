@@ -3,81 +3,217 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ezequiel - Desarrollador Web | Estudiante de Abogacía</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <title>Ezequiel Ponce - Portafolio de Desarrollador Web</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600&family=Montserrat:wght@400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.6;
-            margin: 0;
-            padding: 0;
-            background-color: #f0f2f5; /* Un gris más suave */
-            color: #333;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh; /* Asegura que ocupe toda la altura de la ventana */
+        :root {
+            --primary-color: #0A2540;
+            --secondary-color: #6C757D;
+            --accent-color: #FF4D4D;
+            --background-color: #F8F9FA;
+            --header-font: 'Poppins', sans-serif;
+            --body-font: 'Montserrat', sans-serif;
         }
+
+        body {
+            font-family: var(--body-font);
+            background-color: var(--background-color);
+            color: var(--primary-color);
+            margin: 0;
+            line-height: 1.6;
+        }
+
         .container {
-            max-width: 700px; /* Un poco más estrecho para minimalismo */
-            margin: 20px auto;
-            padding: 30px;
-            background: #fff;
-            border-radius: 12px; /* Bordes más redondeados */
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); /* Sombra más sutil */
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* Header */
+        .main-header {
+            background-color: var(--primary-color);
+            color: white;
+            text-align: center;
+            padding: 4rem 2rem;
+            /* Opcional: añade una imagen de fondo que te represente */
+            background-image: linear-gradient(rgba(10, 37, 64, 0.8), rgba(10, 37, 64, 0.8)), url('https://images.unsplash.com/photo-1551434678-e076c223a692?q=80&w=2070&auto=format&fit=crop'); 
+            background-size: cover;
+            background-position: center;
+        }
+
+        .header-content h1 {
+            font-family: var(--header-font);
+            font-size: 3rem;
+            margin: 0;
+        }
+
+        .header-content h2 {
+            font-size: 1.5rem;
+            font-weight: 400;
+            margin: 0;
+        }
+
+        /* Sections */
+        section {
+            padding-top: 2rem;
+            padding-bottom: 2rem;
+        }
+
+        section h3 {
+            font-family: var(--header-font);
+            text-align: center;
+            margin-bottom: 2rem;
+            font-size: 2rem;
+        }
+
+        /* Project Grid */
+        .project-grid {
+            display: grid;
+            grid-template-columns: 1fr; /* Una columna para un solo proyecto */
+            gap: 2rem;
+            justify-items: center; /* Centra la tarjeta del proyecto */
+        }
+
+        .project-card {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            overflow: hidden;
+            transition: transform 0.3s ease;
+            max-width: 500px; /* Ancho máximo para la tarjeta */
+        }
+
+        .project-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .project-card img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .project-card h4 {
+            font-family: var(--header-font);
+            margin: 1rem 1.5rem;
+        }
+
+        .project-card p {
+            margin: 0 1.5rem 1rem;
+            color: var(--secondary-color);
+        }
+
+        .btn {
+            display: inline-block;
+            background-color: var(--accent-color);
+            color: white !important; /* Importante para sobreescribir otros estilos de 'a' */
+            padding: 0.8rem 1.5rem;
+            border-radius: 5px;
+            text-decoration: none;
+            margin: 0 1.5rem 1.5rem;
+            transition: background-color 0.3s ease;
+            font-weight: normal;
+        }
+
+        .btn:hover {
+            background-color: #e63939;
+        }
+
+        /* Contact and Social */
+        #contact {
             text-align: center;
         }
-        h1 {
-            color: #2c3e50; /* Un azul oscuro elegante */
-            margin-bottom: 15px;
-            font-size: 2.2em; /* Título un poco más grande */
+
+        #contact p {
+             margin-bottom: 1.5rem;
         }
-        p {
-            margin-bottom: 15px;
-            font-size: 1.1em; /* Texto un poco más grande */
-            color: #555;
+
+        #contact a {
+            color: var(--accent-color);
+            text-decoration: none;
+            font-weight: bold;
         }
+
         .social-links {
-            margin-top: 30px;
-            display: flex; /* Para centrar los iconos */
-            justify-content: center;
-            gap: 25px; /* Espacio entre iconos */
+            margin-top: 1.5rem;
         }
+
         .social-links a {
-            color: #3498db; /* Azul vibrante para los iconos */
-            font-size: 2.5em; /* Tamaño de los iconos */
-            text-decoration: none; /* Sin subrayado */
-            transition: color 0.3s ease-in-out, transform 0.3s ease-in-out; /* Transición suave */
+            font-size: 2.2rem;
+            margin: 0 1rem;
+            color: var(--primary-color);
+            transition: color 0.3s ease;
         }
+
         .social-links a:hover {
-            color: #2980b9; /* Color al pasar el ratón */
-            transform: translateY(-3px); /* Pequeño efecto al pasar el ratón */
+            color: var(--accent-color);
         }
-        .footer {
-            margin-top: 40px;
-            font-size: 0.85em;
-            color: #777;
-            border-top: 1px solid #eee; /* Línea sutil en el pie de página */
-            padding-top: 20px;
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 1.5rem;
+            background-color: var(--primary-color);
+            color: white;
+            margin-top: 2rem;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .header-content h1 {
+                font-size: 2.5rem;
+            }
+            .header-content h2 {
+                font-size: 1.2rem;
+            }
+            .container {
+                padding: 1.5rem;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Hola, soy Ezequiel</h1>
-        <p>Soy programador web. Actualmente, estoy ampliando mi horizonte profesional estudiando Abogacía en la Universidad del Aconcagua.</p>
-        <p>Esta doble formación me permite fusionar la lógica de la programación con el pensamiento crítico legal, creando soluciones innovadoras desde múltiples perspectivas.</p>
 
-        <div class="social-links">
-            <a href="https://x.com/ezefix_" target="_blank" aria-label="Twitter/X"><i class="fab fa-x-twitter"></i></a>
-            <a href="https://instagram.com/ezekqz" target="_blank" aria-label="Instagram"><i class="fab fa-instagram"></i></a>
-            <a href="https://steamcommunity.com/profiles/76561199871749124/" target="_blank" aria-label="Steam"><i class="fab fa-steam"></i></a>
-            <a href="https://letterboxd.com/ezekqz/" target="_blank" aria-label="Letterboxd"><i class="fab fa-letterboxd"></i></a>
-            </div>
-
-        <div class="footer">
-            <p>&copy; 2025. Todos los derechos reservados.</p>
+    <header class="main-header">
+        <div class="header-content">
+            <h1>Ezequiel Ponce</h1>
+            <h2>Desarrollador Web</h2>
         </div>
-    </div>
+    </header>
+
+    <main>
+        <section id="about" class="container">
+            <h3>Acerca de Mí</h3>
+            <p style="text-align: center;">Soy un apasionado desarrollador web enfocado en la creación de aplicaciones web modernas y funcionales. Actualmente, combino mi pasión por la tecnología con mis estudios en Derecho en la Universidad de Aconcagua, lo que me brinda una perspectiva única para resolver problemas.</p>
+        </section>
+
+        <section id="projects" class="container">
+            <h3>Mi Proyecto</h3>
+            <div class="project-grid">
+                <div class="project-card">
+                    <img src="https://i.imgur.com/uxkrv3z.png" alt="Proyecto Sitio Web Abogado">
+                    <h4>Sitio Web para Abogado</h4>
+                    <p>Desarrollo de una página web profesional y responsive para un estudio jurídico, enfocada en presentar sus servicios y facilitar el contacto con nuevos clientes.</p>
+                    <a href="http://fmadeofacente.com" class="btn" target="_blank">Visitar Sitio Web</a>
+                </div>
+            </div>
+        </section>
+
+        <section id="contact" class="container">
+            <h3>Contacto</h3>
+            <p>Puedes contactarme a través de mi correo electrónico:</p>
+            <p><a href="mailto:ezexp13@gmail.com">ezexp13@gmail.com</a></p>
+            <div class="social-links">
+                <a href="https://wa.me/5492616552594" target="_blank" title="WhatsApp"><i class="fab fa-whatsapp"></i></a>
+                <a href="https://www.instagram.com/ezekqz" target="_blank" title="Instagram"><i class="fab fa-instagram"></i></a>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>© 2025. Todos los derechos reservados.</p>
+    </footer>
+
 </body>
 </html>

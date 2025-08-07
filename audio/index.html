@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reproductor M4A</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+
+    .audio-player {
+      width: 90%;
+      max-width: 400px;
+      background: #ffffff;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+
+    audio {
+      width: 100%;
+      outline: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="audio-player">
+    <audio controls>
+      <source src="audio/ejemplo.m4a" type="audio/mp4">
+      Tu navegador no soporta audio HTML5.
+    </audio>
+  </div>
+</body>
+</html>

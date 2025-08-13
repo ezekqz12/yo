@@ -3,600 +3,541 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Control de cámara @ 60fps</title>
+<title>Cam @60fps + Mover + Streaming</title>
 <style>
   :root { --bg:#0b0d10; --fg:#e8eef6; --muted:#9fb3c8; --acc:#5cc8ff; --bad:#ff6b6b; --ok:#69db7c; }
-  * { box-sizing: border-box; }
-  body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:var(--bg); color:var(--fg); }
-  header { padding: 1rem; border-bottom:1px solid #1d2530; display:flex; gap:.75rem; align-items:center; flex-wrap:wrap; }
-  header h1 { font-size: clamp(16px, 2.5vw, 20px); margin:0; font-weight:600; }
-  header .pill { font-size:.85rem; color:var(--muted); }
-  main { display:grid; grid-template-columns: 1fr 360px; gap:1rem; padding:1rem; }
-  @media (max-width: 980px) { main { grid-template-columns: 1fr; } }
-  .panel { background:#0f1217; border:1px solid #1d2530; border-radius:12px; overflow:hidden; }
-  .panel h2 { margin:0; padding:.8rem 1rem; border-bottom:1px solid #1d2530; font-size:1rem; color:#c7d5e0; }
-  .panel .content { padding:1rem; }
-  video { width:100%; aspect-ratio: 16 / 9; background:#000; transform-origin:center; touch-action: pinch-zoom; }
-  .controls { display:grid; gap:.5rem; }
-  .row { display:flex; gap:.5rem; flex-wrap:wrap; }
-  button, select, input[type="range"] {
-    background:#11161f; color:var(--fg); border:1px solid #283042; border-radius:10px; padding:.6rem .8rem;
-    font: inherit;
-  }
-  button:hover { border-color:#3a4a66; }
-  button.primary { background:#122338; border-color:#23476b; }
-  button.danger { border-color:#5b2a2a; background:#2a1212; }
-  .small { font-size:.85rem; color:var(--muted); }
-  .stat { display:flex; align-items:center; gap:.4rem; }
-  .stat .dot { width:8px; height:8px; border-radius:999px; background:#3a455a; }
-  .stat.ok .dot { background:var(--ok); }
-  .stat.bad .dot { background:var(--bad); }
-  .grid2 { display:grid; grid-template-columns: 1fr 1fr; gap:.5rem; }
-  .log { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:.9rem; background:#0a0c10; border:1px solid #1d2530; padding:.7rem; border-radius:10px; max-height:180px; overflow:auto; white-space:pre-wrap; }
-  .hidden { display:none !important; }
-  .tag { padding:.25rem .5rem; border:1px solid #283042; border-radius:999px; }
-  .pass { color: var(--ok); }
-  .fail { color: var(--bad); }
-  footer { padding:1rem; color:var(--muted); font-size:.9rem; }
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+  header{padding:12px 14px;border-bottom:1px solid #1d2530;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  h1{margin:0;font-size:1rem;font-weight:600}
+  .tag{border:1px solid #283042;border-radius:999px;padding:3px 8px;font-size:.85rem;color:var(--muted)}
+  main{display:grid;grid-template-columns:1fr 360px;gap:12px;padding:12px}
+  @media(max-width:980px){main{grid-template-columns:1fr}}
+  .panel{background:#0f1217;border:1px solid #1d2530;border-radius:12px;overflow:hidden}
+  .panel h2{margin:0;padding:10px 12px;border-bottom:1px solid #1d2530;font-size:1rem;color:#c7d5e0}
+  .content{padding:12px}
+  video{width:100%;aspect-ratio:16/9;background:#000;transform-origin:center}
+  .row{display:flex;gap:8px;flex-wrap:wrap}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  button,select,input[type="range"],input[type="number"],textarea{background:#11161f;color:var(--fg);border:1px solid #283042;border-radius:10px;padding:.6rem .8rem;font:inherit}
+  button:hover{border-color:#3a4a66}
+  button.primary{background:#122338;border-color:#23476b}
+  button.danger{background:#2a1212;border-color:#5b2a2a}
+  .small{font-size:.85rem;color:var(--muted)}
+  .log{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.9rem;background:#0a0c10;border:1px solid #1d2530;padding:.6rem;border-radius:10px;max-height:160px;overflow:auto;white-space:pre-wrap}
+  .hidden{display:none!important}
+  .kpi{display:flex;align-items:center;gap:6px}
+  .kpi .dot{width:8px;height:8px;border-radius:999px;background:#3a455a}
+  .kpi.ok .dot{background:var(--ok)}
+  .kpi.bad .dot{background:var(--bad)}
+  details>summary{cursor:pointer}
 </style>
 </head>
 <body>
-  <header>
-    <h1>Control de cámara (intenta 1080p @ 60 fps)</h1>
-    <span id="secureState" class="pill tag">HTTPS: …</span>
-    <span id="permState" class="pill tag">Permiso cámara: …</span>
-    <span id="deviceState" class="pill tag">Dispositivos: …</span>
-  </header>
+<header>
+  <h1>Cam @60fps + Mover + Streaming</h1>
+  <span id="secureState" class="tag">HTTPS: …</span>
+  <span id="permState" class="tag">Permiso cámara: …</span>
+  <span id="deviceState" class="tag">Dispositivos: …</span>
+</header>
 
-  <main>
-    <section class="panel">
-      <h2>Vista</h2>
-      <div class="content">
-        <video id="preview" playsinline autoplay muted></video>
-        <div class="row" style="margin-top:.6rem">
-          <div class="stat" id="fpsStat"><span class="dot"></span><span id="fpsText">FPS: —</span></div>
-          <div class="stat" id="resStat"><span class="dot"></span><span id="resText">Resolución: —</span></div>
-          <div class="stat" id="zoomStat"><span class="dot"></span><span id="zoomText">Zoom: —</span></div>
-          <div class="stat" id="torchStat"><span class="dot"></span><span id="torchText">Torch: —</span></div>
-        </div>
+<main>
+  <section class="panel">
+    <h2>Vista</h2>
+    <div class="content">
+      <video id="preview" playsinline autoplay muted></video>
+      <div class="row" style="margin-top:8px">
+        <div class="kpi" id="fpsK"><span class="dot"></span><span id="fpsTxt">FPS: —</span></div>
+        <div class="kpi" id="resK"><span class="dot"></span><span id="resTxt">Resolución: —</span></div>
+        <div class="kpi" id="zoomK"><span class="dot"></span><span id="zoomTxt">Zoom: —</span></div>
+        <div class="kpi" id="torchK"><span class="dot"></span><span id="torchTxt">Torch: —</span></div>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <aside class="panel">
-      <h2>Controles</h2>
-      <div class="content controls">
-        <div class="row">
-          <button id="btnStart" class="primary">🎥 Iniciar cámara</button>
-          <button id="btnStop" class="danger" disabled>⏹️ Detener</button>
-          <button id="btnFullscreen">⛶ Pantalla completa</button>
-        </div>
+  <aside class="panel">
+    <h2>Controles</h2>
+    <div class="content">
+      <div class="row">
+        <button id="btnStart" class="primary">🎥 Iniciar cámara</button>
+        <button id="btnStop" class="danger" disabled>⏹️ Detener</button>
+        <button id="btnFS">⛶ Pantalla completa</button>
+      </div>
 
-        <div class="grid2">
-          <label>FPS deseados
-            <select id="selFps">
-              <option value="60" selected>60</option>
-              <option value="30">30</option>
-              <option value="24">24</option>
-            </select>
-          </label>
-          <label>Resolución
-            <select id="selRes">
-              <option value="1920x1080" selected>1080p</option>
-              <option value="1280x720">720p</option>
-              <option value="640x480">480p</option>
-            </select>
-          </label>
-        </div>
-
-        <div class="grid2">
-          <label>Cámara
-            <select id="selDevice"></select>
-          </label>
-          <label>Foco cámara
-            <select id="selFacing">
-              <option value="environment" selected>Trasera</option>
-              <option value="user">Frontal</option>
-            </select>
-          </label>
-        </div>
-
-        <label>Zoom
-          <input id="rangeZoom" type="range" min="1" max="1" step="0.01" value="1" disabled />
+      <div class="grid2" style="margin-top:8px">
+        <label>FPS
+          <select id="selFps">
+            <option value="60">60</option>
+            <option value="30" selected>30</option>
+            <option value="24">24</option>
+          </select>
         </label>
+        <label>Resolución
+          <select id="selRes">
+            <option value="1920x1080" selected>1080p</option>
+            <option value="1280x720">720p</option>
+            <option value="640x480">480p</option>
+          </select>
+        </label>
+      </div>
 
-        <div class="row">
-          <button id="btnTorch" disabled>💡 Torch</button>
-          <button id="btnWake">🔒 Mantener pantalla encendida</button>
-          <button id="btnSwitch">🔄 Cambiar cámara</button>
-        </div>
+      <div class="grid2" style="margin-top:8px">
+        <label>Cámara
+          <select id="selDevice"></select>
+        </label>
+        <label>Foco
+          <select id="selFacing">
+            <option value="environment" selected>Trasera</option>
+            <option value="user">Frontal</option>
+          </select>
+        </label>
+      </div>
 
-        <div class="row">
-          <button id="btnRec" disabled>⏺️ Grabar</button>
-          <button id="btnStopRec" class="danger" disabled>⬛ Detener grabación</button>
-          <a id="dlLink" class="hidden" download="grabacion.webm">⬇️ Descargar</a>
-        </div>
+      <label style="display:block;margin-top:8px">Zoom
+        <input id="rngZoom" type="range" min="1" max="1" step="0.01" value="1" disabled />
+      </label>
 
-        <details>
-          <summary>Diagnóstico / Tests</summary>
-          <div class="small">Ejecuta pruebas para detectar problemas típicos (HTTPS, permisos, APIs, enumeración…)</div>
-          <div class="row" style="margin-top:.5rem">
-            <button id="btnRunTests">▶️ Correr tests</button>
+      <!-- NUEVO: Controles mover -->
+      <div class="panel" style="margin-top:8px">
+        <h2 style="border:none">Mover vista</h2>
+        <div class="content">
+          <div class="row">
+            <button id="mvUp">▲</button>
           </div>
-          <div id="testResults" class="log" aria-live="polite"></div>
-        </details>
-
-        <div id="messages" class="log" style="margin-top:.5rem"></div>
-        <div class="small">
-          <strong>Tips si ves “NotAllowedError”:</strong>
-          1) Asegurate de usar <u>HTTPS</u> o <u>localhost</u>. 2) Toca “Iniciar cámara” y cuando el navegador pregunte, elegí <u>Permitir</u>. 3) Si alguna vez pusiste “Bloquear”, abrí la configuración del sitio y reseteá permisos.
+          <div class="row">
+            <button id="mvLeft">◀︎</button>
+            <button id="mvReset">● reset</button>
+            <button id="mvRight">▶︎</button>
+          </div>
+          <div class="row">
+            <button id="mvDown">▼</button>
+          </div>
+          <div class="grid2" style="margin-top:8px">
+            <label>Velocidad (px por toque)
+              <input id="mvSpeed" type="number" min="1" max="200" step="1" value="12" />
+            </label>
+            <label>Desplazamiento X/Y (px)
+              <div class="row">
+                <input id="mvX" type="number" step="1" value="0" />
+                <input id="mvY" type="number" step="1" value="0" />
+              </div>
+            </label>
+          </div>
+          <div class="small">Funciona siempre por CSS; si tu cámara soporta <em>pan/tilt</em> nativo, también lo intentará.</div>
         </div>
       </div>
-    </aside>
-  </main>
 
-  <footer>
-    Si tu equipo no soporta zoom nativo o torch, la app usa alternativas (zoom de previsualización por pellizco/slide).
-  </footer>
+      <div class="row" style="margin-top:8px">
+        <button id="btnTorch" disabled>💡 Torch</button>
+        <button id="btnWake">🔒 Mantener pantalla encendida</button>
+        <button id="btnSwitch">🔄 Cambiar cámara</button>
+      </div>
+
+      <div class="row" style="margin-top:8px">
+        <button id="btnRec" disabled>⏺️ Grabar</button>
+        <button id="btnStopRec" class="danger" disabled>⬛ Detener grabación</button>
+        <a id="dlLink" class="hidden" download>⬇️ Descargar</a>
+      </div>
+
+      <details style="margin-top:8px">
+        <summary>Diagnóstico / Tests</summary>
+        <div class="row" style="margin:.5rem 0">
+          <button id="btnTests">▶️ Correr tests</button>
+          <button id="btnTestMove">🧪 Test mover</button>
+        </div>
+        <div id="testLog" class="log" aria-live="polite"></div>
+      </details>
+
+      <div id="messages" class="log" style="margin-top:8px"></div>
+      <div class="small">Tips: usá <b>HTTPS</b> o <b>localhost</b>. Si alguna vez bloqueaste la cámara, reactivá permisos en la configuración del sitio.</div>
+    </div>
+  </aside>
+</main>
+
+<!-- STREAMING P2P -->
+<section class="panel" style="margin:12px">
+  <h2>Streaming P2P (ver en tu PC en tiempo real)</h2>
+  <div class="content">
+    <div class="row">
+      <label class="row">Soy:
+        <select id="role">
+          <option value="broadcaster">Emisor (celular)</option>
+          <option value="viewer">Receptor (PC)</option>
+        </select>
+      </label>
+      <button id="wsStart" class="primary">🔗 Iniciar conexión</button>
+    </div>
+
+    <div id="broadcasterUI" class="hidden">
+      <div class="small" style="margin:.5rem 0">1) En el celu (Emisor) tocá “Crear oferta” y copiá el texto. 2) En la PC (Receptor) pegá la oferta, genera la respuesta y copiala acá. 3) Aplicá la respuesta.</div>
+      <div class="row">
+        <button id="btnCreateOffer" class="primary">📤 Crear oferta</button>
+        <button id="btnCopyOffer">📋 Copiar oferta</button>
+      </div>
+      <textarea id="offerOut" rows="6" placeholder="Oferta (SDP) para pegar en la PC"></textarea>
+
+      <div class="row" style="margin-top:.5rem">
+        <button id="btnApplyAnswer" class="primary">📥 Aplicar respuesta</button>
+      </div>
+      <textarea id="answerIn" rows="6" placeholder="Pegá aquí la respuesta (SDP) generada en la PC"></textarea>
+    </div>
+
+    <div id="viewerUI" class="hidden">
+      <div class="small" style="margin:.5rem 0">1) Pegá la <b>Oferta</b> del celu. 2) Tocá “Generar respuesta” y copiala de vuelta al celu.</div>
+      <textarea id="offerIn" rows="6" placeholder="Pegá aquí la oferta (SDP) del celular"></textarea>
+      <div class="row" style="margin-top:.5rem">
+        <button id="btnCreateAnswer" class="primary">🧾 Generar respuesta</button>
+        <button id="btnCopyAnswer">📋 Copiar respuesta</button>
+      </div>
+      <textarea id="answerOut" rows="6" placeholder="Respuesta (SDP) para pegar en el celular"></textarea>
+
+      <div class="panel" style="margin-top:.75rem">
+        <h2 style="border:none">Controles remotos (desde la PC)</h2>
+        <div class="content">
+          <div class="row">
+            <button id="rUp">▲</button>
+          </div>
+          <div class="row">
+            <button id="rLeft">◀︎</button>
+            <button id="rReset">● reset</button>
+            <button id="rRight">▶︎</button>
+          </div>
+          <div class="row">
+            <button id="rDown">▼</button>
+          </div>
+          <label>Zoom remoto
+            <input id="rZoom" type="range" min="1" max="8" step="0.01" value="1" />
+          </label>
+          <div class="small">Estos controles envían comandos al celu por DataChannel.</div>
+        </div>
+      </div>
+
+      <video id="remoteVideo" autoplay playsinline controls muted class="hidden"></video>
+    </div>
+  </div>
+</section>
 
 <script>
 (() => {
-  const $ = sel => document.querySelector(sel);
-  const log = (msg, type='info') => {
-    const el = $('#messages');
-    const ts = new Date().toLocaleTimeString();
-    el.textContent += `[${ts}] ${msg}\n`;
-    el.scrollTop = el.scrollHeight;
-    console[type === 'error' ? 'error' : 'log'](msg);
-  };
+  const $ = s=>document.querySelector(s);
+  const logEl = $('#messages');
+  const tlog = $('#testLog');
+  const log = (m, type='info') => { const ts=new Date().toLocaleTimeString(); logEl.textContent += `[${ts}] ${m}\n`; logEl.scrollTop=logEl.scrollHeight; (type==='error'?console.error:console.log)(m); };
 
   const preview = $('#preview');
-  const btnStart = $('#btnStart');
-  const btnStop = $('#btnStop');
-  const btnFullscreen = $('#btnFullscreen');
-  const btnWake = $('#btnWake');
-  const btnSwitch = $('#btnSwitch');
-  const selFps = $('#selFps');
-  const selRes = $('#selRes');
-  const selDevice = $('#selDevice');
-  const selFacing = $('#selFacing');
-  const rangeZoom = $('#rangeZoom');
-  const btnTorch = $('#btnTorch');
-  const btnRec = $('#btnRec');
-  const btnStopRec = $('#btnStopRec');
-  const dlLink = $('#dlLink');
+  const btnStart = $('#btnStart'), btnStop=$('#btnStop'), btnFS=$('#btnFS'), btnSwitch=$('#btnSwitch');
+  const btnTorch=$('#btnTorch'), btnWake=$('#btnWake'), btnRec=$('#btnRec'), btnStopRec=$('#btnStopRec'), dlLink=$('#dlLink');
+  const selFps=$('#selFps'), selRes=$('#selRes'), selDevice=$('#selDevice'), selFacing=$('#selFacing');
+  const rngZoom=$('#rngZoom');
+  const fpsTxt=$('#fpsTxt'), fpsK=$('#fpsK'), resTxt=$('#resTxt'), resK=$('#resK'), zoomTxt=$('#zoomTxt'), zoomK=$('#zoomK'), torchTxt=$('#torchTxt'), torchK=$('#torchK');
+  const mvUp=$('#mvUp'), mvDown=$('#mvDown'), mvLeft=$('#mvLeft'), mvRight=$('#mvRight'), mvReset=$('#mvReset'), mvSpeed=$('#mvSpeed'), mvX=$('#mvX'), mvY=$('#mvY');
 
-  const secureState = $('#secureState');
-  const permState = $('#permState');
-  const deviceState = $('#deviceState');
+  const secureState=$('#secureState'), permState=$('#permState'), deviceState=$('#deviceState');
 
-  const fpsText = $('#fpsText'), fpsStat = $('#fpsStat');
-  const resText = $('#resText'), resStat = $('#resStat');
-  const zoomText = $('#zoomText'), zoomStat = $('#zoomStat');
-  const torchText = $('#torchText'), torchStat = $('#torchStat');
+  let stream=null, track=null, mediaRecorder=null, chunks=[];
+  let wakeLock=null, rafId=null;
+  // Transform CSS (fallback de mover/zoom)
+  let css = { scale:1, x:0, y:0 };
 
-  let stream = null;
-  let mediaTrack = null;
-  let mediaRecorder = null;
-  let chunks = [];
-  let wakeLock = null;
-  let rafId = null;
-  let cssZoom = 1, cssOffset = {x:0,y:0};
-  let pinch = {active:false, startDist:0, startZoom:1};
+  // --- Helpers ---
+  const isSecure = ()=> (location.protocol==='https:' || location.hostname==='localhost' || location.hostname==='127.0.0.1');
+  const parseRes = s=>({width:Number(s.split('x')[0]), height:Number(s.split('x')[1])});
+  const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 
-  // ---------- Utilidades / helpers ----------
-  const clamp = (v,min,max)=>Math.min(max,Math.max(min,v));
-  const supportedMime = (() => {
-    const types = [
-      'video/webm;codecs=vp9,opus',
-      'video/webm;codecs=vp8,opus',
-      'video/webm',
-      'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
-      'video/mp4'
-    ];
-    return types.find(t => MediaRecorder.isTypeSupported?.(t)) || '';
-  })();
+  function updateSecureTag(){ const ok=isSecure(); secureState.textContent=`HTTPS: ${ok?'sí':'no'}`; secureState.style.borderColor=ok?'#294d34':'#5b2a2a'; }
 
-  function isSecure() {
-    const ok = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-    secureState.textContent = `HTTPS: ${ok ? 'sí' : 'no'}`;
-    secureState.style.borderColor = ok ? '#294d34' : '#5b2a2a';
-    return ok;
-  }
-
-  async function getPermissionState() {
-    try {
-      if (!('permissions' in navigator)) throw new Error('Permissions API no disponible');
-      // "camera" no es estándar en todos; algunos navegadores usan "camera", otros no exponen
-      const q = await navigator.permissions.query({ name: 'camera' });
+  async function permCheck(){
+    try{
+      if(!('permissions' in navigator)) throw 0;
+      const q = await navigator.permissions.query({name:'camera'});
       permState.textContent = `Permiso cámara: ${q.state}`;
-      return q.state;
-    } catch {
-      // Sin Permissions API: estado desconocido hasta intentar getUserMedia
-      permState.textContent = 'Permiso cámara: (desconocido)';
-      return 'prompt';
-    }
+    } catch { permState.textContent = 'Permiso cámara: (desconocido)'; }
   }
 
-  async function listDevices() {
-    try {
-      const list = await navigator.mediaDevices.enumerateDevices();
-      const vids = list.filter(d => d.kind === 'videoinput');
-      selDevice.innerHTML = '';
-      vids.forEach((d, i) => {
-        const opt = document.createElement('option');
-        opt.value = d.deviceId;
-        opt.textContent = d.label || `Cámara ${i+1}`;
-        selDevice.appendChild(opt);
-      });
-      deviceState.textContent = `Dispositivos: ${vids.length}`;
+  async function listDevices(){
+    try{
+      const devs= await navigator.mediaDevices.enumerateDevices();
+      const vids=devs.filter(d=>d.kind==='videoinput');
+      selDevice.innerHTML='';
+      vids.forEach((d,i)=>{ const o=document.createElement('option'); o.value=d.deviceId; o.textContent=d.label||`Cámara ${i+1}`; selDevice.appendChild(o); });
+      deviceState.textContent=`Dispositivos: ${vids.length}`;
       return vids;
-    } catch (e) {
-      deviceState.textContent = `Dispositivos: error`;
-      log('No se pudieron enumerar dispositivos: ' + e.message, 'error');
-      return [];
-    }
+    }catch(e){ deviceState.textContent='Dispositivos: error'; log('enumerateDevices error: '+e.message,'error'); return []; }
   }
 
-  function parseRes(value) {
-    const [w,h] = value.split('x').map(Number);
-    return { width:w, height:h };
-  }
+  function applyCss(){ preview.style.transform=`translate(${css.x}px,${css.y}px) scale(${css.scale})`; mvX.value=Math.round(css.x); mvY.value=Math.round(css.y); }
 
-  function buildConstraints() {
-    const fps = Number(selFps.value);
-    const { width, height } = parseRes(selRes.value);
-    const facing = selFacing.value;
-    const deviceId = selDevice.value || undefined;
-    const video = {
-      width: { ideal: width }, height: { ideal: height },
-      frameRate: { ideal: fps, max: fps },
-      facingMode: deviceId ? undefined : ({ ideal: facing }),
-      deviceId: deviceId ? ({ exact: deviceId }) : undefined,
-      // PTZ props se establecen dinámicamente con applyConstraints si existen
-    };
-    return { audio: false, video };
-  }
-
-  async function applyZoom(v) {
-    if (!mediaTrack) return;
-    const caps = mediaTrack.getCapabilities?.() || {};
-    const settings = mediaTrack.getSettings?.() || {};
-    if ('zoom' in caps) {
-      const min = caps.zoom.min ?? 1;
-      const max = caps.zoom.max ?? 10;
-      const nv = clamp(v, min, max);
-      await mediaTrack.applyConstraints({ advanced: [{ zoom: nv }] });
-      rangeZoom.value = nv;
-      rangeZoom.min = min; rangeZoom.max = max; rangeZoom.step = 0.01;
-      zoomText.textContent = `Zoom: nativo x${nv.toFixed(2)}`;
-      zoomStat.classList.add('ok');
+  async function applyZoom(val){
+    if(!track){ css.scale=clamp(val,1,8); applyCss(); return; }
+    const caps=track.getCapabilities?.()||{}, set=track.getSettings?.()||{};
+    if('zoom' in caps){
+      const min=caps.zoom.min??1, max=caps.zoom.max??10, nv=clamp(val,min,max);
+      try{ await track.applyConstraints({advanced:[{zoom:nv}]}); rngZoom.min=min; rngZoom.max=max; rngZoom.step=0.01; rngZoom.value=nv; zoomTxt.textContent=`Zoom: nativo x${nv.toFixed(2)}`; zoomK.classList.add('ok'); }
+      catch{ css.scale=nv; applyCss(); zoomTxt.textContent=`Zoom(vista) x${nv.toFixed(2)}`; zoomK.classList.remove('ok'); }
     } else {
-      // zoom de previsualización (CSS) — no afecta a la grabación
-      cssZoom = clamp(v, 1, 8);
-      updateCssTransform();
-      rangeZoom.value = cssZoom; rangeZoom.min = 1; rangeZoom.max = 8; rangeZoom.step = 0.01;
-      zoomText.textContent = `Zoom (vista) x${cssZoom.toFixed(2)}`;
-      zoomStat.classList.remove('ok');
+      css.scale=clamp(val,1,8); applyCss(); zoomTxt.textContent=`Zoom(vista) x${css.scale.toFixed(2)}`; zoomK.classList.remove('ok');
     }
   }
 
-  function updateCssTransform() {
-    preview.style.transform = `scale(${cssZoom}) translate(${cssOffset.x}px, ${cssOffset.y}px)`;
-  }
-
-  async function toggleTorch() {
-    if (!mediaTrack) return;
-    const caps = mediaTrack.getCapabilities?.() || {};
-    const settings = mediaTrack.getSettings?.() || {};
-    if (!('torch' in caps)) {
-      torchText.textContent = 'Torch: no disponible';
-      torchStat.classList.remove('ok');
-      return;
+  async function nudge(dx,dy){
+    // PTZ si existe
+    if(track){
+      const caps=track.getCapabilities?.()||{}, set=track.getSettings?.()||{};
+      if('pan' in caps || 'tilt' in caps){
+        try{
+          const np=('pan'in caps)? clamp((set.pan||0)+dx, caps.pan.min, caps.pan.max):undefined;
+          const nt=('tilt'in caps)? clamp((set.tilt||0)+dy, caps.tilt.min, caps.tilt.max):undefined;
+          await track.applyConstraints({advanced:[{pan:np, tilt:nt}]});
+          return;
+        }catch(e){ /* cae a CSS */ }
+      }
     }
-    const cur = settings.torch === true;
-    await mediaTrack.applyConstraints({ advanced: [{ torch: !cur }] });
-    const after = mediaTrack.getSettings().torch === true;
-    btnTorch.textContent = after ? '💡 Torch (ON)' : '💡 Torch';
-    torchText.textContent = `Torch: ${after ? 'ON' : 'OFF'}`;
-    torchStat.classList.add('ok');
+    // CSS fallback
+    css.x += dx; css.y += dy; applyCss();
   }
 
-  // ---------- FPS meter ----------
-  function startFpsMeter() {
-    let last = performance.now();
-    let frames = 0;
-    let acc = 0;
+  function resetView(){ css.x=0; css.y=0; css.scale=1; applyCss(); rngZoom.value=1; }
+
+  // Gestos táctiles
+  let pinch={active:false,startDist:0,startScale:1};
+  const dist=(a,b)=>Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);
+  preview.addEventListener('touchstart',e=>{ if(e.touches.length===2){ pinch.active=true; pinch.startDist=dist(e.touches[0],e.touches[1]); pinch.startScale=Number(rngZoom.value||css.scale); }},{passive:true});
+  preview.addEventListener('touchmove',e=>{ if(pinch.active&&e.touches.length===2){ const f=dist(e.touches[0],e.touches[1])/(pinch.startDist||1); applyZoom(pinch.startScale*f); }},{passive:true});
+  preview.addEventListener('touchend',e=>{ if(e.touches.length<2) pinch.active=false; },{passive:true});
+
+  // Teclas de flecha
+  window.addEventListener('keydown',e=>{
+    const step=Number(mvSpeed.value)||12;
+    if(e.key==='ArrowUp') nudge(0,-step);
+    if(e.key==='ArrowDown') nudge(0,step);
+    if(e.key==='ArrowLeft') nudge(-step,0);
+    if(e.key==='ArrowRight') nudge(step,0);
+  });
+
+  // FPS meter
+  function startFPS(){
     cancelAnimationFrame(rafId);
-    const tick = t => {
-      frames++;
-      const dt = t - last;
-      if (dt >= 1000) {
-        const fps = (frames * 1000) / dt;
-        fpsText.textContent = `FPS: ${fps.toFixed(1)}`;
-        fpsStat.classList.toggle('ok', fps >= (Number(selFps.value) - 5));
-        frames = 0; last = t;
-      }
-      rafId = requestAnimationFrame(tick);
+    let last=performance.now(), frames=0;
+    const tick=(t)=>{
+      frames++; const dt=t-last;
+      if(dt>=1000){ const fps=(frames*1000/dt); fpsTxt.textContent=`FPS: ${fps.toFixed(1)}`; fpsK.classList.toggle('ok', fps >= Number(selFps.value)-5); frames=0; last=t; }
+      rafId=requestAnimationFrame(tick);
     };
-    rafId = requestAnimationFrame(tick);
+    rafId=requestAnimationFrame(tick);
   }
-  function stopFpsMeter() { cancelAnimationFrame(rafId); }
+  function stopFPS(){ cancelAnimationFrame(rafId); }
 
-  // ---------- Cámara ----------
-  async function startCamera(withFallback=true) {
-    if (!isSecure()) {
-      log('⚠️ Debes usar HTTPS o localhost para acceder a la cámara', 'error');
-      return;
-    }
-    try {
-      const constraints = buildConstraints();
-      log('Solicitando cámara con: ' + JSON.stringify(constraints.video));
-      const s = await navigator.mediaDevices.getUserMedia(constraints);
+  function buildConstraints(){
+    const {width,height}=parseRes(selRes.value);
+    const fps=Number(selFps.value);
+    const deviceId=selDevice.value||undefined;
+    const facing=selFacing.value;
+    return { audio:false, video: {
+      width:{ideal:width}, height:{ideal:height}, frameRate:{ideal:fps,max:fps},
+      deviceId: deviceId?{exact:deviceId}:undefined,
+      facingMode: deviceId?undefined:{ideal:facing}
+    }};
+  }
+
+  async function startCam(){
+    if(!isSecure()){ log('Necesitás HTTPS o localhost','error'); return; }
+    try{
+      const s = await navigator.mediaDevices.getUserMedia(buildConstraints());
       onStream(s);
-    } catch (e) {
-      if (e.name === 'NotAllowedError' || e.name === 'SecurityError') {
-        log('Permiso de cámara denegado o bloqueado. Revisá la configuración del sitio y vuelve a intentar.', 'error');
-        permState.textContent = 'Permiso cámara: denied';
-        return;
-      }
-      if (e.name === 'OverconstrainedError' && withFallback) {
-        log(`No pudo con las restricciones pedidas (${e.constraint}). Intentando fallback…`);
-        // Fallback: bajar FPS y resolución progresivamente
-        const order = [
-          { fps: 60, res: '1280x720' },
-          { fps: 30, res: '1920x1080' },
-          { fps: 30, res: '1280x720' },
-          { fps: 24, res: '1280x720' },
-          { fps: 30, res: '640x480' },
-        ];
-        for (const opt of order) {
-          selFps.value = String(opt.fps);
-          selRes.value = opt.res;
-          try {
-            const s2 = await navigator.mediaDevices.getUserMedia(buildConstraints());
-            log(`Fallback exitoso: ${opt.res} @ ${opt.fps}fps`);
-            onStream(s2);
-            return;
-          } catch {}
-        }
-        log('No se pudo abrir la cámara con ningún fallback', 'error');
-        return;
-      }
-      log(`Error al abrir la cámara: ${e.name}: ${e.message}`, 'error');
+    }catch(e){
+      if(e.name==='NotAllowedError'){ log('Permiso denegado. Revisá configuración del sitio.', 'error'); permState.textContent='Permiso cámara: denied'; return; }
+      if(e.name==='OverconstrainedError'){ log('No se pudo con esas restricciones; probá 720p/30fps', 'error'); }
+      log(`Error getUserMedia: ${e.name}: ${e.message}`, 'error');
     }
   }
 
-  function onStream(s) {
-    stopFpsMeter();
-    if (stream) stopCamera();
-    stream = s;
-    preview.srcObject = stream;
-    mediaTrack = stream.getVideoTracks()[0];
-    btnStop.disabled = false;
-    btnRec.disabled = false;
-    btnTorch.disabled = false;
-    rangeZoom.disabled = false;
-
-    // Actualizar settings/capabilities
-    const caps = mediaTrack.getCapabilities?.() || {};
-    const sets = mediaTrack.getSettings?.() || {};
-    resText.textContent = `Resolución: ${sets.width || '—'}x${sets.height || '—'} @ ${sets.frameRate || '—'}fps`;
-    resStat.classList.add('ok');
-
-    // Config zoom UI
-    if ('zoom' in caps) {
-      rangeZoom.min = caps.zoom.min ?? 1;
-      rangeZoom.max = caps.zoom.max ?? 10;
-      rangeZoom.step = 0.01;
-      rangeZoom.value = sets.zoom ?? 1;
-      zoomText.textContent = `Zoom: nativo x${(sets.zoom ?? 1).toFixed(2)}`;
-      zoomStat.classList.add('ok');
-    } else {
-      rangeZoom.min = 1; rangeZoom.max = 8; rangeZoom.step = 0.01; rangeZoom.value = 1;
-      zoomText.textContent = `Zoom (vista) x1.00`;
-      zoomStat.classList.remove('ok');
-    }
-
-    if (('torch' in caps)) {
-      torchText.textContent = `Torch: ${sets.torch ? 'ON' : 'OFF'}`;
-      btnTorch.disabled = false;
-    } else {
-      torchText.textContent = 'Torch: no disponible';
-      btnTorch.disabled = true;
-    }
-
-    // Refrescar lista de dispositivos (ya con labels)
-    listDevices().then(() => {
-      // Seleccionar el device activo si coincide
-      const id = mediaTrack.getSettings?.().deviceId;
-      if (id) selDevice.value = id;
-    });
-
-    startFpsMeter();
+  function onStream(s){
+    stopCam();
+    stream=s; track=stream.getVideoTracks()[0];
+    preview.srcObject=stream; btnStop.disabled=false; btnRec.disabled=true /* habilito luego */;
+    const caps=track.getCapabilities?.()||{}, set=track.getSettings?.()||{};
+    resTxt.textContent=`Resolución: ${set.width||'—'}x${set.height||'—'} @ ${set.frameRate||'—'}fps`; resK.classList.add('ok');
+    // Zoom UI
+    if('zoom' in caps){ rngZoom.min=caps.zoom.min??1; rngZoom.max=caps.zoom.max??10; rngZoom.step=0.01; rngZoom.value=set.zoom??1; zoomTxt.textContent=`Zoom: nativo x${(set.zoom??1).toFixed(2)}`; zoomK.classList.add('ok'); }
+    else { rngZoom.min=1;rngZoom.max=8;rngZoom.step=0.01;rngZoom.value=1; zoomTxt.textContent='Zoom(vista) x1.00'; zoomK.classList.remove('ok'); }
+    // Torch
+    if('torch' in caps){ btnTorch.disabled=false; torchTxt.textContent=`Torch: ${set.torch?'ON':'OFF'}`; torchK.classList.add('ok'); }
+    else { btnTorch.disabled=true; torchTxt.textContent='Torch: no disponible'; torchK.classList.remove('ok'); }
+    // Devices con etiquetas
+    listDevices().then(()=>{ const id=set.deviceId; if(id) selDevice.value=id; });
+    startFPS();
+    btnRec.disabled=false;
   }
 
-  function stopCamera() {
-    stopFpsMeter();
-    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-      try { mediaRecorder.stop(); } catch {}
-    }
-    if (stream) {
-      stream.getTracks().forEach(t => t.stop());
-    }
-    stream = null; mediaTrack = null;
-    preview.srcObject = null;
-    btnStop.disabled = true;
-    btnRec.disabled = true;
-    btnStopRec.disabled = true;
-    btnTorch.disabled = true;
-    rangeZoom.disabled = true;
+  function stopCam(){
+    stopFPS();
+    if(stream){ stream.getTracks().forEach(t=>t.stop()); }
+    stream=null; track=null; preview.srcObject=null;
+    btnStop.disabled=true; btnRec.disabled=true; btnStopRec.disabled=true; btnTorch.disabled=true; rngZoom.disabled=false;
   }
 
-  // ---------- Grabación ----------
-  function startRec() {
-    if (!stream) return;
-    chunks = [];
-    try {
-      mediaRecorder = new MediaRecorder(stream, supportedMime ? { mimeType: supportedMime } : undefined);
-    } catch (e) {
-      log('MediaRecorder no soportado: ' + e.message, 'error');
-      return;
-    }
-    mediaRecorder.ondataavailable = ev => { if (ev.data && ev.data.size) chunks.push(ev.data); };
-    mediaRecorder.onstop = () => {
-      const blob = new Blob(chunks, { type: mediaRecorder.mimeType || 'video/webm' });
-      const url = URL.createObjectURL(blob);
-      dlLink.href = url;
-      dlLink.classList.remove('hidden');
-      dlLink.setAttribute('download', `grabacion_${Date.now()}.${mediaRecorder.mimeType?.includes('mp4')?'mp4':'webm'}`);
-    };
-    mediaRecorder.start();
-    btnRec.disabled = true;
-    btnStopRec.disabled = false;
-    log('Grabación iniciada.');
-  }
-  function stopRec() {
-    if (!mediaRecorder) return;
-    mediaRecorder.stop();
-    btnStopRec.disabled = true;
-    btnRec.disabled = false;
-    log('Grabación detenida.');
-  }
-
-  // ---------- Gestos: zoom por pellizco / arrastre ----------
-  function dist(t1, t2) {
-    const dx = t1.clientX - t2.clientX;
-    const dy = t1.clientY - t2.clientY;
-    return Math.hypot(dx,dy);
-  }
-  preview.addEventListener('touchstart', e => {
-    if (e.touches.length === 2) {
-      pinch.active = true;
-      pinch.startDist = dist(e.touches[0], e.touches[1]);
-      pinch.startZoom = Number(rangeZoom.value || 1);
-    }
-  }, {passive:true});
-  preview.addEventListener('touchmove', e => {
-    if (pinch.active && e.touches.length === 2) {
-      const d = dist(e.touches[0], e.touches[1]);
-      const factor = d / (pinch.startDist || d);
-      applyZoom(pinch.startZoom * factor);
-    }
-  }, {passive:true});
-  preview.addEventListener('touchend', e => { if (e.touches.length < 2) pinch.active = false; });
-
-  // Arrastre para “mover” vista cuando hay zoom CSS
-  let drag = {active:false, startX:0, startY:0, baseX:0, baseY:0};
-  preview.addEventListener('pointerdown', e => {
-    drag.active = true; drag.startX = e.clientX; drag.startY = e.clientY; drag.baseX = cssOffset.x; drag.baseY = cssOffset.y;
-  });
-  window.addEventListener('pointerup', ()=> drag.active=false);
-  window.addEventListener('pointermove', e => {
-    if (!drag.active) return;
-    cssOffset.x = drag.baseX + (e.clientX - drag.startX) / 100;
-    cssOffset.y = drag.baseY + (e.clientY - drag.startY) / 100;
-    updateCssTransform();
+  // Torch
+  btnTorch.addEventListener('click', async ()=>{
+    if(!track) return;
+    const caps=track.getCapabilities?.()||{}; if(!('torch' in caps)) return;
+    try{
+      const set=track.getSettings?.()||{}; const next = !(set.torch===true);
+      await track.applyConstraints({advanced:[{torch:next}]});
+      torchTxt.textContent=`Torch: ${next?'ON':'OFF'}`;
+    }catch(e){ log('Torch error: '+e.message,'error'); }
   });
 
-  // ---------- Wake Lock / Fullscreen ----------
-  async function toggleWake() {
-    if ('wakeLock' in navigator) {
-      if (!wakeLock) {
-        try { wakeLock = await navigator.wakeLock.request('screen'); btnWake.textContent='🔓 Pantalla encendida (ON)'; }
-        catch(e){ log('No se pudo activar WakeLock: ' + e.message, 'error'); }
-      } else {
-        try { await wakeLock.release(); } catch {}
-        wakeLock = null; btnWake.textContent='🔒 Mantener pantalla encendida';
-      }
-    } else {
-      log('Wake Lock no soportado. Subí brillo/tiempo de pantalla manualmente.');
-    }
+  // Grabación
+  const mimePref = ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm','video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4']
+                    .find(t=>window.MediaRecorder?.isTypeSupported?.(t))||'';
+  function startRec(){
+    if(!stream) return;
+    try{ mediaRecorder = new MediaRecorder(stream, mimePref?{mimeType:mimePref}:{}) }catch(e){ log('MediaRecorder no soportado: '+e.message,'error'); return; }
+    chunks=[]; mediaRecorder.ondataavailable=e=>{ if(e.data?.size) chunks.push(e.data); };
+    mediaRecorder.onstop=()=>{ const blob=new Blob(chunks,{type:mediaRecorder.mimeType||'video/webm'}); const url=URL.createObjectURL(blob); dlLink.href=url; dlLink.download=`grab_${Date.now()}.${mediaRecorder.mimeType?.includes('mp4')?'mp4':'webm'}`; dlLink.classList.remove('hidden'); };
+    mediaRecorder.start(); btnRec.disabled=true; btnStopRec.disabled=false; log('Grabando…');
   }
+  function stopRec(){ if(mediaRecorder && mediaRecorder.state!=='inactive') mediaRecorder.stop(); btnStopRec.disabled=true; btnRec.disabled=false; log('Grabación detenida.'); }
 
-  function toggleFullscreen() {
-    const el = document.fullscreenElement ? document : document.documentElement;
-    if (document.fullscreenElement) document.exitFullscreen();
-    else document.documentElement.requestFullscreen?.();
-  }
+  // Mover
+  const step=()=>Number(mvSpeed.value)||12;
+  mvUp.addEventListener('click', ()=> nudge(0,-step()));
+  mvDown.addEventListener('click', ()=> nudge(0, step()));
+  mvLeft.addEventListener('click', ()=> nudge(-step(),0));
+  mvRight.addEventListener('click', ()=> nudge( step(),0));
+  mvReset.addEventListener('click', resetView);
+  mvX.addEventListener('change', ()=>{ css.x=Number(mvX.value)||0; applyCss(); });
+  mvY.addEventListener('change', ()=>{ css.y=Number(mvY.value)||0; applyCss(); });
 
-  // ---------- Eventos UI ----------
-  btnStart.addEventListener('click', async () => {
-    await getPermissionState(); // refrescar indicador
-    await startCamera(true);
-  });
-  btnStop.addEventListener('click', stopCamera);
-  btnSwitch.addEventListener('click', async () => {
-    const vids = await listDevices();
-    if (!vids.length) return;
-    const idx = Math.max(0, vids.findIndex(v => v.deviceId === selDevice.value));
-    const next = vids[(idx+1) % vids.length];
-    selDevice.value = next.deviceId;
-    startCamera(false);
-  });
-  selDevice.addEventListener('change', ()=> startCamera(false));
-  selFacing.addEventListener('change', ()=> startCamera(false));
-  selFps.addEventListener('change', ()=> startCamera(false));
-  selRes.addEventListener('change', ()=> startCamera(false));
-  rangeZoom.addEventListener('input', e => applyZoom(Number(e.target.value)));
-  btnTorch.addEventListener('click', toggleTorch);
+  // Zoom input
+  rngZoom.addEventListener('input', e=> applyZoom(Number(e.target.value)));
+
+  // Botones básicos
+  btnStart.addEventListener('click', async()=>{ await permCheck(); await startCam(); });
+  btnStop.addEventListener('click', stopCam);
+  btnSwitch.addEventListener('click', async()=>{ const d=await listDevices(); if(!d.length) return; const idx=Math.max(0, d.findIndex(v=>v.deviceId===selDevice.value)); const next=d[(idx+1)%d.length]; selDevice.value=next.deviceId; startCam(); });
+  selDevice.addEventListener('change', ()=> startCam());
+  selFacing.addEventListener('change', ()=> startCam());
+  selFps.addEventListener('change', ()=> startCam());
+  selRes.addEventListener('change', ()=> startCam());
+  btnFS.addEventListener('click', ()=>{ if(!document.fullscreenElement) document.documentElement.requestFullscreen?.(); else document.exitFullscreen?.(); });
+  btnWake.addEventListener('click', async()=>{ try{ if(!wakeLock) { wakeLock=await navigator.wakeLock.request('screen'); btnWake.textContent='🔓 Pantalla encendida (ON)'; wakeLock.addEventListener('release',()=>{wakeLock=null; btnWake.textContent='🔒 Mantener pantalla encendida';}); } else { await wakeLock.release(); } }catch(e){ log('WakeLock error: '+e.message,'error'); } });
   btnRec.addEventListener('click', startRec);
   btnStopRec.addEventListener('click', stopRec);
-  btnWake.addEventListener('click', toggleWake);
-  btnFullscreen.addEventListener('click', toggleFullscreen);
-
-  // ---------- Tests embebidos (auto-diagnóstico) ----------
-  const tests = [
-    {
-      name: 'Contexto seguro (HTTPS/localhost)',
-      run: () => isSecure()
-    },
-    {
-      name: 'APIs disponibles: mediaDevices/getUserMedia',
-      run: () => !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)
-    },
-    {
-      name: 'Permissions API (opcional)',
-      run: () => 'permissions' in navigator
-    },
-    {
-      name: 'Enumeración de dispositivos',
-      run: async () => {
-        try { const d = await navigator.mediaDevices.enumerateDevices(); return Array.isArray(d); }
-        catch { return false; }
-      }
-    },
-    {
-      name: 'Intento de abrir cámara (sin forzar 60fps)',
-      run: async () => {
-        // Hacer una prueba suave a 30fps/720p para no fallar por sobre-restricción
-        const c = { video: { width: {ideal: 1280}, height:{ideal:720}, frameRate:{ideal:30} }, audio:false };
-        try {
-          const s = await navigator.mediaDevices.getUserMedia(c);
-          s.getTracks().forEach(t=>t.stop());
-          return true;
-        } catch { return false; }
-      }
-    }
-  ];
-
-  $('#btnRunTests').addEventListener('click', async () => {
-    const out = $('#testResults');
-    out.textContent = '';
-    for (const t of tests) {
-      try {
-        const r = await t.run();
-        out.textContent += `${r ? '✅' : '❌'} ${t.name}\n`;
-      } catch (e) {
-        out.textContent += `❌ ${t.name} (error: ${e.message})\n`;
-      }
-    }
-    out.scrollTop = out.scrollHeight;
-  });
 
   // Estado inicial
-  isSecure();
-  getPermissionState();
-  listDevices();
+  updateSecureTag(); permCheck(); listDevices();
+
+  // --------- TESTS ----------
+  $('#btnTests').addEventListener('click', async ()=>{
+    const lines=[];
+    lines.push(`${isSecure()?'✅':'❌'} Contexto seguro`);
+    lines.push(`${navigator.mediaDevices?.getUserMedia?'✅':'❌'} getUserMedia`);
+    try{ const d=await navigator.mediaDevices.enumerateDevices(); lines.push(`${Array.isArray(d)?'✅':'❌'} enumerateDevices`); }catch{ lines.push('❌ enumerateDevices'); }
+    lines.push(`${'RTCPeerConnection' in window?'✅':'❌'} RTCPeerConnection`);
+    tlog.textContent = lines.join('\n');
+  });
+  $('#btnTestMove').addEventListener('click', ()=>{
+    const before = preview.style.transform;
+    css.x+=5; applyCss();
+    const after = preview.style.transform;
+    tlog.textContent += `\n${before!==after?'✅':'❌'} Mover modificó transform`;
+    tlog.scrollTop=tlog.scrollHeight;
+  });
+
+  // =======================
+  //  STREAMING P2P (manual)
+  // =======================
+  const roleSel=$('#role'), wsStart=$('#wsStart');
+  const bUI=$('#broadcasterUI'), vUI=$('#viewerUI');
+  const offerOut=$('#offerOut'), answerIn=$('#answerIn');
+  const offerIn=$('#offerIn'), answerOut=$('#answerOut');
+  const btnCreateOffer=$('#btnCreateOffer'), btnCopyOffer=$('#btnCopyOffer'), btnApplyAnswer=$('#btnApplyAnswer');
+  const btnCreateAnswer=$('#btnCreateAnswer'), btnCopyAnswer=$('#btnCopyAnswer');
+  const remoteVideo=$('#remoteVideo');
+  const rUp=$('#rUp'), rDown=$('#rDown'), rLeft=$('#rLeft'), rRight=$('#rRight'), rReset=$('#rReset'), rZoom=$('#rZoom');
+
+  let pc=null, ctrl=null; // DataChannel cuando soy broadcaster; cuando soy viewer, se recibe
+
+  function pcConfig(){ return { iceServers:[{urls:'stun:stun.l.google.com:19302'}] }; }
+
+  function showRoleUI(){
+    const r = roleSel.value;
+    bUI.classList.toggle('hidden', r!=='broadcaster');
+    vUI.classList.toggle('hidden', r!=='viewer');
+    remoteVideo.classList.toggle('hidden', r!=='viewer');
+  }
+  showRoleUI();
+  roleSel.addEventListener('change', showRoleUI);
+
+  wsStart.addEventListener('click', ()=>{
+    if (pc) { try{pc.close();}catch{} pc=null; }
+    pc = new RTCPeerConnection(pcConfig());
+    log('RTCPeerConnection creada.');
+    if(roleSel.value==='broadcaster'){
+      if(!stream){ log('Iniciá la cámara antes de transmitir.','error'); return; }
+      stream.getTracks().forEach(t=> pc.addTrack(t, stream));
+      // DataChannel para control remoto
+      ctrl = pc.createDataChannel('ctrl');
+      ctrl.onopen = ()=> log('Canal de control abierto.');
+      ctrl.onmessage = (ev)=> {
+        try{
+          const msg = JSON.parse(ev.data);
+          if(msg.t==='nudge'){ nudge(msg.dx, msg.dy); }
+          if(msg.t==='zoom'){ applyZoom(msg.z); }
+          if(msg.t==='reset'){ resetView(); }
+        }catch{}
+      };
+    } else {
+      pc.ontrack = (ev)=>{ remoteVideo.srcObject = ev.streams[0]; };
+      pc.ondatachannel = (ev)=> { ctrl = ev.channel; log('Canal de control listo (viewer).'); };
+      // Recibir solo video
+      pc.addTransceiver('video', { direction:'recvonly' });
+    }
+    pc.onicecandidate = (e)=> { /* los ICE se embeben en el SDP automáticamente */ };
+  });
+
+  // Broadcaster: crear oferta
+  btnCreateOffer.addEventListener('click', async ()=>{
+    if(!pc){ log('Primero “Iniciar conexión”.','error'); return; }
+    const offer = await pc.createOffer({offerToReceiveAudio:false, offerToReceiveVideo:false});
+    await pc.setLocalDescription(offer);
+    offerOut.value = JSON.stringify(pc.localDescription);
+    log('Oferta creada. Copiala a la PC.');
+  });
+  btnCopyOffer.addEventListener('click', ()=>{ offerOut.select(); document.execCommand('copy'); });
+
+  // Broadcaster: aplicar answer
+  btnApplyAnswer.addEventListener('click', async ()=>{
+    if(!pc){ log('Primero “Iniciar conexión”.','error'); return; }
+    try{
+      const ans = JSON.parse(answerIn.value);
+      await pc.setRemoteDescription(ans);
+      log('Respuesta aplicada. Conectado (P2P).');
+    }catch(e){ log('Error aplicando respuesta: '+e.message,'error'); }
+  });
+
+  // Viewer: crear answer
+  btnCreateAnswer.addEventListener('click', async ()=>{
+    if(!pc){ log('Primero “Iniciar conexión”.','error'); return; }
+    try{
+      const off = JSON.parse(offerIn.value);
+      await pc.setRemoteDescription(off);
+      const ans = await pc.createAnswer();
+      await pc.setLocalDescription(ans);
+      answerOut.value = JSON.stringify(pc.localDescription);
+      log('Respuesta creada. Copiala al celu.');
+    }catch(e){ log('Error creando respuesta: '+e.message,'error'); }
+  });
+  btnCopyAnswer.addEventListener('click', ()=>{ answerOut.select(); document.execCommand('copy'); });
+
+  // Controles remotos desde la PC (viewer -> broadcaster)
+  function sendCtrl(obj){ if(ctrl && ctrl.readyState==='open'){ ctrl.send(JSON.stringify(obj)); } }
+  rUp.addEventListener('click', ()=> sendCtrl({t:'nudge', dx:0, dy:- (Number(mvSpeed.value)||12)}));
+  rDown.addEventListener('click', ()=> sendCtrl({t:'nudge', dx:0, dy: (Number(mvSpeed.value)||12)}));
+  rLeft.addEventListener('click', ()=> sendCtrl({t:'nudge', dx:- (Number(mvSpeed.value)||12), dy:0}));
+  rRight.addEventListener('click', ()=> sendCtrl({t:'nudge', dx: (Number(mvSpeed.value)||12), dy:0}));
+  rReset.addEventListener('click', ()=> sendCtrl({t:'reset'}));
+  rZoom.addEventListener('input', e=> sendCtrl({t:'zoom', z:Number(e.target.value)}));
 
 })();
 </script>

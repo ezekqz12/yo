@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Cam @60fps + Mover + Streaming</title>
+<title>Cam @60fps + Mover + Streaming (fix handshake)</title>
 <style>
   :root { --bg:#0b0d10; --fg:#e8eef6; --muted:#9fb3c8; --acc:#5cc8ff; --bad:#ff6b6b; --ok:#69db7c; }
   *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
@@ -23,13 +23,15 @@
   button.primary{background:#122338;border-color:#23476b}
   button.danger{background:#2a1212;border-color:#5b2a2a}
   .small{font-size:.85rem;color:var(--muted)}
-  .log{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.9rem;background:#0a0c10;border:1px solid #1d2530;padding:.6rem;border-radius:10px;max-height:160px;overflow:auto;white-space:pre-wrap}
+  .log{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.9rem;background:#0a0c10;border:1px solid #1d2530;padding:.6rem;border-radius:10px;max-height:180px;overflow:auto;white-space:pre-wrap}
   .hidden{display:none!important}
   .kpi{display:flex;align-items:center;gap:6px}
   .kpi .dot{width:8px;height:8px;border-radius:999px;background:#3a455a}
   .kpi.ok .dot{background:var(--ok)}
   .kpi.bad .dot{background:var(--bad)}
   details>summary{cursor:pointer}
+  .state{display:grid;grid-template-columns:repeat(4,auto);gap:8px;align-items:center}
+  .state .pill{padding:.2rem .5rem;border:1px solid #283042;border-radius:999px;font-size:.8rem}
 </style>
 </head>
 <body>
@@ -66,8 +68,8 @@
       <div class="grid2" style="margin-top:8px">
         <label>FPS
           <select id="selFps">
-            <option value="60">60</option>
-            <option value="30" selected>30</option>
+            <option value="60" selected>60</option>
+            <option value="30">30</option>
             <option value="24">24</option>
           </select>
         </label>
@@ -96,7 +98,7 @@
         <input id="rngZoom" type="range" min="1" max="1" step="0.01" value="1" disabled />
       </label>
 
-      <!-- NUEVO: Controles mover -->
+      <!-- Mover -->
       <div class="panel" style="margin-top:8px">
         <h2 style="border:none">Mover vista</h2>
         <div class="content">
@@ -122,7 +124,7 @@
               </div>
             </label>
           </div>
-          <div class="small">Funciona siempre por CSS; si tu cámara soporta <em>pan/tilt</em> nativo, también lo intentará.</div>
+          <div class="small">Siempre funciona por CSS; si tu cámara soporta PTZ nativo, también lo intentará.</div>
         </div>
       </div>
 
@@ -158,37 +160,54 @@
   <h2>Streaming P2P (ver en tu PC en tiempo real)</h2>
   <div class="content">
     <div class="row">
-      <label class="row">Soy:
+      <label class="row">Rol:
         <select id="role">
           <option value="broadcaster">Emisor (celular)</option>
           <option value="viewer">Receptor (PC)</option>
         </select>
       </label>
       <button id="wsStart" class="primary">🔗 Iniciar conexión</button>
+      <button id="wsReset" class="danger" disabled>♻️ Reiniciar P2P</button>
+    </div>
+
+    <div class="state" style="margin:.5rem 0">
+      <div class="pill">signaling: <span id="sigState">—</span></div>
+      <div class="pill">ice: <span id="iceState">—</span></div>
+      <div class="pill">gather: <span id="gathState">—</span></div>
+      <div class="pill">conn: <span id="connState">—</span></div>
     </div>
 
     <div id="broadcasterUI" class="hidden">
-      <div class="small" style="margin:.5rem 0">1) En el celu (Emisor) tocá “Crear oferta” y copiá el texto. 2) En la PC (Receptor) pegá la oferta, genera la respuesta y copiala acá. 3) Aplicá la respuesta.</div>
+      <ol class="small" style="margin:.5rem 0">
+        <li>En el celu, tocá “Crear oferta” y esperá a que diga <b>ICE listo</b>.</li>
+        <li>Copiá la oferta y pegala en la PC para generar la respuesta.</li>
+        <li>Pegá aquí la <b>respuesta</b> de la PC y aplicala.</li>
+      </ol>
       <div class="row">
-        <button id="btnCreateOffer" class="primary">📤 Crear oferta</button>
-        <button id="btnCopyOffer">📋 Copiar oferta</button>
+        <button id="btnCreateOffer" class="primary" disabled>📤 Crear oferta</button>
+        <button id="btnCopyOffer" disabled>📋 Copiar oferta</button>
       </div>
-      <textarea id="offerOut" rows="6" placeholder="Oferta (SDP) para pegar en la PC"></textarea>
+      <textarea id="offerOut" rows="6" placeholder="Oferta (SDP) para pegar en la PC" readonly></textarea>
 
       <div class="row" style="margin-top:.5rem">
-        <button id="btnApplyAnswer" class="primary">📥 Aplicar respuesta</button>
+        <button id="btnApplyAnswer" class="primary" disabled>📥 Aplicar respuesta</button>
       </div>
       <textarea id="answerIn" rows="6" placeholder="Pegá aquí la respuesta (SDP) generada en la PC"></textarea>
+      <div class="small" id="broadHint"></div>
     </div>
 
     <div id="viewerUI" class="hidden">
-      <div class="small" style="margin:.5rem 0">1) Pegá la <b>Oferta</b> del celu. 2) Tocá “Generar respuesta” y copiala de vuelta al celu.</div>
+      <ol class="small" style="margin:.5rem 0">
+        <li>Pegá la <b>oferta</b> del celu.</li>
+        <li>Generá la <b>respuesta</b> y esperá a que diga <b>ICE listo</b>.</li>
+        <li>Copiala al celu.</li>
+      </ol>
       <textarea id="offerIn" rows="6" placeholder="Pegá aquí la oferta (SDP) del celular"></textarea>
       <div class="row" style="margin-top:.5rem">
-        <button id="btnCreateAnswer" class="primary">🧾 Generar respuesta</button>
-        <button id="btnCopyAnswer">📋 Copiar respuesta</button>
+        <button id="btnCreateAnswer" class="primary" disabled>🧾 Generar respuesta</button>
+        <button id="btnCopyAnswer" disabled>📋 Copiar respuesta</button>
       </div>
-      <textarea id="answerOut" rows="6" placeholder="Respuesta (SDP) para pegar en el celular"></textarea>
+      <textarea id="answerOut" rows="6" placeholder="Respuesta (SDP) para pegar en el celular" readonly></textarea>
 
       <div class="panel" style="margin-top:.75rem">
         <h2 style="border:none">Controles remotos (desde la PC)</h2>
@@ -207,7 +226,7 @@
           <label>Zoom remoto
             <input id="rZoom" type="range" min="1" max="8" step="0.01" value="1" />
           </label>
-          <div class="small">Estos controles envían comandos al celu por DataChannel.</div>
+          <div class="small">Envía comandos al celu por DataChannel.</div>
         </div>
       </div>
 
@@ -217,14 +236,26 @@
 </section>
 
 <script>
-(() => {
-  const $ = s=>document.querySelector(s);
-  const logEl = $('#messages');
-  const tlog = $('#testLog');
-  const log = (m, type='info') => { const ts=new Date().toLocaleTimeString(); logEl.textContent += `[${ts}] ${m}\n`; logEl.scrollTop=logEl.scrollHeight; (type==='error'?console.error:console.log)(m); };
+(()=> {
+  // ---------- util ----------
+  const $=s=>document.querySelector(s);
+  const logEl=$('#messages'), tlog=$('#testLog');
+  const log=(m,type='info')=>{ const ts=new Date().toLocaleTimeString(); logEl.textContent+=`[${ts}] ${m}\n`; logEl.scrollTop=logEl.scrollHeight; (type==='error'?console.error:console.log)(m); };
+  const isSecure=()=> (location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1');
+  const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+  const parseRes = s=>({width:Number(s.split('x')[0]),height:Number(s.split('x')[1])});
+  function waitIceComplete(pc, timeoutMs=8000){
+    return new Promise(resolve=>{
+      if(pc.iceGatheringState==='complete') return resolve();
+      const done=()=>{ if(pc.iceGatheringState==='complete'){ pc.removeEventListener('icegatheringstatechange',done); resolve(); } };
+      pc.addEventListener('icegatheringstatechange',done);
+      setTimeout(resolve, timeoutMs); // fallback por si algún browser no notifica
+    });
+  }
 
-  const preview = $('#preview');
-  const btnStart = $('#btnStart'), btnStop=$('#btnStop'), btnFS=$('#btnFS'), btnSwitch=$('#btnSwitch');
+  // ---------- UI base ----------
+  const preview=$('#preview');
+  const btnStart=$('#btnStart'), btnStop=$('#btnStop'), btnFS=$('#btnFS'), btnSwitch=$('#btnSwitch');
   const btnTorch=$('#btnTorch'), btnWake=$('#btnWake'), btnRec=$('#btnRec'), btnStopRec=$('#btnStopRec'), dlLink=$('#dlLink');
   const selFps=$('#selFps'), selRes=$('#selRes'), selDevice=$('#selDevice'), selFacing=$('#selFacing');
   const rngZoom=$('#rngZoom');
@@ -233,39 +264,21 @@
 
   const secureState=$('#secureState'), permState=$('#permState'), deviceState=$('#deviceState');
 
-  let stream=null, track=null, mediaRecorder=null, chunks=[];
-  let wakeLock=null, rafId=null;
-  // Transform CSS (fallback de mover/zoom)
-  let css = { scale:1, x:0, y:0 };
+  let stream=null, track=null, mediaRecorder=null, chunks=[], wakeLock=null, rafId=null;
+  let css={scale:1,x:0,y:0};
 
-  // --- Helpers ---
-  const isSecure = ()=> (location.protocol==='https:' || location.hostname==='localhost' || location.hostname==='127.0.0.1');
-  const parseRes = s=>({width:Number(s.split('x')[0]), height:Number(s.split('x')[1])});
-  const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
-
-  function updateSecureTag(){ const ok=isSecure(); secureState.textContent=`HTTPS: ${ok?'sí':'no'}`; secureState.style.borderColor=ok?'#294d34':'#5b2a2a'; }
+  // Init tags
+  secureState.textContent=`HTTPS: ${isSecure()?'sí':'no'}`;
 
   async function permCheck(){
-    try{
-      if(!('permissions' in navigator)) throw 0;
-      const q = await navigator.permissions.query({name:'camera'});
-      permState.textContent = `Permiso cámara: ${q.state}`;
-    } catch { permState.textContent = 'Permiso cámara: (desconocido)'; }
+    try{ if(!('permissions' in navigator)) throw 0; const q=await navigator.permissions.query({name:'camera'}); permState.textContent=`Permiso cámara: ${q.state}`; }
+    catch{ permState.textContent='Permiso cámara: (desconocido)'; }
   }
-
   async function listDevices(){
-    try{
-      const devs= await navigator.mediaDevices.enumerateDevices();
-      const vids=devs.filter(d=>d.kind==='videoinput');
-      selDevice.innerHTML='';
-      vids.forEach((d,i)=>{ const o=document.createElement('option'); o.value=d.deviceId; o.textContent=d.label||`Cámara ${i+1}`; selDevice.appendChild(o); });
-      deviceState.textContent=`Dispositivos: ${vids.length}`;
-      return vids;
-    }catch(e){ deviceState.textContent='Dispositivos: error'; log('enumerateDevices error: '+e.message,'error'); return []; }
+    try{ const devs=await navigator.mediaDevices.enumerateDevices(); const vids=devs.filter(d=>d.kind==='videoinput'); selDevice.innerHTML=''; vids.forEach((d,i)=>{ const o=document.createElement('option'); o.value=d.deviceId; o.textContent=d.label||`Cámara ${i+1}`; selDevice.appendChild(o); }); deviceState.textContent=`Dispositivos: ${vids.length}`; return vids; }
+    catch(e){ deviceState.textContent='Dispositivos: error'; log('enumerateDevices: '+e.message,'error'); return []; }
   }
-
   function applyCss(){ preview.style.transform=`translate(${css.x}px,${css.y}px) scale(${css.scale})`; mvX.value=Math.round(css.x); mvY.value=Math.round(css.y); }
-
   async function applyZoom(val){
     if(!track){ css.scale=clamp(val,1,8); applyCss(); return; }
     const caps=track.getCapabilities?.()||{}, set=track.getSettings?.()||{};
@@ -273,130 +286,69 @@
       const min=caps.zoom.min??1, max=caps.zoom.max??10, nv=clamp(val,min,max);
       try{ await track.applyConstraints({advanced:[{zoom:nv}]}); rngZoom.min=min; rngZoom.max=max; rngZoom.step=0.01; rngZoom.value=nv; zoomTxt.textContent=`Zoom: nativo x${nv.toFixed(2)}`; zoomK.classList.add('ok'); }
       catch{ css.scale=nv; applyCss(); zoomTxt.textContent=`Zoom(vista) x${nv.toFixed(2)}`; zoomK.classList.remove('ok'); }
-    } else {
-      css.scale=clamp(val,1,8); applyCss(); zoomTxt.textContent=`Zoom(vista) x${css.scale.toFixed(2)}`; zoomK.classList.remove('ok');
-    }
+    } else { css.scale=clamp(val,1,8); applyCss(); zoomTxt.textContent=`Zoom(vista) x${css.scale.toFixed(2)}`; zoomK.classList.remove('ok'); }
   }
-
   async function nudge(dx,dy){
-    // PTZ si existe
     if(track){
       const caps=track.getCapabilities?.()||{}, set=track.getSettings?.()||{};
       if('pan' in caps || 'tilt' in caps){
-        try{
-          const np=('pan'in caps)? clamp((set.pan||0)+dx, caps.pan.min, caps.pan.max):undefined;
-          const nt=('tilt'in caps)? clamp((set.tilt||0)+dy, caps.tilt.min, caps.tilt.max):undefined;
-          await track.applyConstraints({advanced:[{pan:np, tilt:nt}]});
-          return;
-        }catch(e){ /* cae a CSS */ }
+        try{ const np=('pan'in caps)? clamp((set.pan||0)+dx, caps.pan.min, caps.pan.max):undefined;
+             const nt=('tilt'in caps)? clamp((set.tilt||0)+dy, caps.tilt.min, caps.tilt.max):undefined;
+             await track.applyConstraints({advanced:[{pan:np, tilt:nt}]}); return; } catch {}
       }
     }
-    // CSS fallback
-    css.x += dx; css.y += dy; applyCss();
+    css.x+=dx; css.y+=dy; applyCss();
   }
-
   function resetView(){ css.x=0; css.y=0; css.scale=1; applyCss(); rngZoom.value=1; }
 
-  // Gestos táctiles
+  // Gestos y teclas
   let pinch={active:false,startDist:0,startScale:1};
   const dist=(a,b)=>Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);
   preview.addEventListener('touchstart',e=>{ if(e.touches.length===2){ pinch.active=true; pinch.startDist=dist(e.touches[0],e.touches[1]); pinch.startScale=Number(rngZoom.value||css.scale); }},{passive:true});
   preview.addEventListener('touchmove',e=>{ if(pinch.active&&e.touches.length===2){ const f=dist(e.touches[0],e.touches[1])/(pinch.startDist||1); applyZoom(pinch.startScale*f); }},{passive:true});
   preview.addEventListener('touchend',e=>{ if(e.touches.length<2) pinch.active=false; },{passive:true});
-
-  // Teclas de flecha
-  window.addEventListener('keydown',e=>{
-    const step=Number(mvSpeed.value)||12;
-    if(e.key==='ArrowUp') nudge(0,-step);
-    if(e.key==='ArrowDown') nudge(0,step);
-    if(e.key==='ArrowLeft') nudge(-step,0);
-    if(e.key==='ArrowRight') nudge(step,0);
-  });
+  window.addEventListener('keydown',e=>{ const step=Number(mvSpeed.value)||12; if(e.key==='ArrowUp') nudge(0,-step); if(e.key==='ArrowDown') nudge(0,step); if(e.key==='ArrowLeft') nudge(-step,0); if(e.key==='ArrowRight') nudge(step,0); });
 
   // FPS meter
-  function startFPS(){
-    cancelAnimationFrame(rafId);
-    let last=performance.now(), frames=0;
-    const tick=(t)=>{
-      frames++; const dt=t-last;
-      if(dt>=1000){ const fps=(frames*1000/dt); fpsTxt.textContent=`FPS: ${fps.toFixed(1)}`; fpsK.classList.toggle('ok', fps >= Number(selFps.value)-5); frames=0; last=t; }
-      rafId=requestAnimationFrame(tick);
-    };
-    rafId=requestAnimationFrame(tick);
-  }
+  function startFPS(){ cancelAnimationFrame(rafId); let last=performance.now(), frames=0; const tick=(t)=>{ frames++; const dt=t-last; if(dt>=1000){ const fps=(frames*1000/dt); fpsTxt.textContent=`FPS: ${fps.toFixed(1)}`; fpsK.classList.toggle('ok', fps>=Number(selFps.value)-5); frames=0; last=t; } rafId=requestAnimationFrame(tick); }; rafId=requestAnimationFrame(tick); }
   function stopFPS(){ cancelAnimationFrame(rafId); }
 
-  function buildConstraints(){
-    const {width,height}=parseRes(selRes.value);
-    const fps=Number(selFps.value);
-    const deviceId=selDevice.value||undefined;
-    const facing=selFacing.value;
-    return { audio:false, video: {
-      width:{ideal:width}, height:{ideal:height}, frameRate:{ideal:fps,max:fps},
-      deviceId: deviceId?{exact:deviceId}:undefined,
-      facingMode: deviceId?undefined:{ideal:facing}
-    }};
+  // Cámara
+  function buildConstraints(){ const {width,height}=parseRes(selRes.value); const fps=Number(selFps.value); const deviceId=selDevice.value||undefined; const facing=selFacing.value;
+    return {audio:false, video:{ width:{ideal:width}, height:{ideal:height}, frameRate:{ideal:fps,max:fps}, deviceId:deviceId?{exact:deviceId}:undefined, facingMode:deviceId?undefined:{ideal:facing} }};
   }
-
-  async function startCam(){
-    if(!isSecure()){ log('Necesitás HTTPS o localhost','error'); return; }
-    try{
-      const s = await navigator.mediaDevices.getUserMedia(buildConstraints());
-      onStream(s);
-    }catch(e){
-      if(e.name==='NotAllowedError'){ log('Permiso denegado. Revisá configuración del sitio.', 'error'); permState.textContent='Permiso cámara: denied'; return; }
-      if(e.name==='OverconstrainedError'){ log('No se pudo con esas restricciones; probá 720p/30fps', 'error'); }
-      log(`Error getUserMedia: ${e.name}: ${e.message}`, 'error');
-    }
+  async function startCam(){ if(!isSecure()){ log('Necesitás HTTPS o localhost','error'); return; }
+    try{ const s=await navigator.mediaDevices.getUserMedia(buildConstraints()); onStream(s); }
+    catch(e){ if(e.name==='NotAllowedError'){ log('Permiso denegado. Revisá configuración del sitio.','error'); permState.textContent='Permiso cámara: denied'; return; } log(`getUserMedia: ${e.name}: ${e.message}`,'error'); }
   }
-
-  function onStream(s){
-    stopCam();
-    stream=s; track=stream.getVideoTracks()[0];
-    preview.srcObject=stream; btnStop.disabled=false; btnRec.disabled=true /* habilito luego */;
-    const caps=track.getCapabilities?.()||{}, set=track.getSettings?.()||{};
-    resTxt.textContent=`Resolución: ${set.width||'—'}x${set.height||'—'} @ ${set.frameRate||'—'}fps`; resK.classList.add('ok');
-    // Zoom UI
+  function onStream(s){ stopCam(); stream=s; track=stream.getVideoTracks()[0]; preview.srcObject=stream; btnStop.disabled=false; btnRec.disabled=false;
+    const caps=track.getCapabilities?.()||{}, set=track.getSettings?.()||{}; resTxt.textContent=`Resolución: ${set.width||'—'}x${set.height||'—'} @ ${set.frameRate||'—'}fps`; resK.classList.add('ok');
     if('zoom' in caps){ rngZoom.min=caps.zoom.min??1; rngZoom.max=caps.zoom.max??10; rngZoom.step=0.01; rngZoom.value=set.zoom??1; zoomTxt.textContent=`Zoom: nativo x${(set.zoom??1).toFixed(2)}`; zoomK.classList.add('ok'); }
     else { rngZoom.min=1;rngZoom.max=8;rngZoom.step=0.01;rngZoom.value=1; zoomTxt.textContent='Zoom(vista) x1.00'; zoomK.classList.remove('ok'); }
-    // Torch
     if('torch' in caps){ btnTorch.disabled=false; torchTxt.textContent=`Torch: ${set.torch?'ON':'OFF'}`; torchK.classList.add('ok'); }
     else { btnTorch.disabled=true; torchTxt.textContent='Torch: no disponible'; torchK.classList.remove('ok'); }
-    // Devices con etiquetas
     listDevices().then(()=>{ const id=set.deviceId; if(id) selDevice.value=id; });
     startFPS();
-    btnRec.disabled=false;
   }
+  function stopCam(){ stopFPS(); if(stream){ stream.getTracks().forEach(t=>t.stop()); } stream=null; track=null; preview.srcObject=null; btnStop.disabled=true; btnRec.disabled=true; btnStopRec.disabled=true; btnTorch.disabled=true; }
 
-  function stopCam(){
-    stopFPS();
-    if(stream){ stream.getTracks().forEach(t=>t.stop()); }
-    stream=null; track=null; preview.srcObject=null;
-    btnStop.disabled=true; btnRec.disabled=true; btnStopRec.disabled=true; btnTorch.disabled=true; rngZoom.disabled=false;
-  }
-
-  // Torch
-  btnTorch.addEventListener('click', async ()=>{
-    if(!track) return;
-    const caps=track.getCapabilities?.()||{}; if(!('torch' in caps)) return;
-    try{
-      const set=track.getSettings?.()||{}; const next = !(set.torch===true);
-      await track.applyConstraints({advanced:[{torch:next}]});
-      torchTxt.textContent=`Torch: ${next?'ON':'OFF'}`;
-    }catch(e){ log('Torch error: '+e.message,'error'); }
-  });
+  btnStart.addEventListener('click', async()=>{ await permCheck(); await startCam(); });
+  btnStop.addEventListener('click', stopCam);
+  btnSwitch.addEventListener('click', async()=>{ const d=await listDevices(); if(!d.length) return; const idx=Math.max(0, d.findIndex(v=>v.deviceId===selDevice.value)); const next=d[(idx+1)%d.length]; selDevice.value=next.deviceId; startCam(); });
+  selDevice.addEventListener('change', ()=> startCam());
+  selFacing.addEventListener('change', ()=> startCam());
+  selFps.addEventListener('change', ()=> startCam());
+  selRes.addEventListener('change', ()=> startCam());
+  $('#btnFS').addEventListener('click', ()=>{ if(!document.fullscreenElement) document.documentElement.requestFullscreen?.(); else document.exitFullscreen?.(); });
+  btnWake.addEventListener('click', async()=>{ try{ if(!wakeLock) { wakeLock=await navigator.wakeLock.request('screen'); btnWake.textContent='🔓 Pantalla encendida (ON)'; wakeLock.addEventListener('release',()=>{wakeLock=null; btnWake.textContent='🔒 Mantener pantalla encendida';}); } else { await wakeLock.release(); } }catch(e){ log('WakeLock: '+e.message,'error'); } });
+  btnTorch.addEventListener('click', async()=>{ if(!track) return; const caps=track.getCapabilities?.()||{}; if(!('torch' in caps)) return; try{ const set=track.getSettings?.()||{}; const next=!(set.torch===true); await track.applyConstraints({advanced:[{torch:next}]}); torchTxt.textContent=`Torch: ${next?'ON':'OFF'}`; }catch(e){ log('Torch: '+e.message,'error'); } });
 
   // Grabación
-  const mimePref = ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm','video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4']
-                    .find(t=>window.MediaRecorder?.isTypeSupported?.(t))||'';
-  function startRec(){
-    if(!stream) return;
-    try{ mediaRecorder = new MediaRecorder(stream, mimePref?{mimeType:mimePref}:{}) }catch(e){ log('MediaRecorder no soportado: '+e.message,'error'); return; }
-    chunks=[]; mediaRecorder.ondataavailable=e=>{ if(e.data?.size) chunks.push(e.data); };
-    mediaRecorder.onstop=()=>{ const blob=new Blob(chunks,{type:mediaRecorder.mimeType||'video/webm'}); const url=URL.createObjectURL(blob); dlLink.href=url; dlLink.download=`grab_${Date.now()}.${mediaRecorder.mimeType?.includes('mp4')?'mp4':'webm'}`; dlLink.classList.remove('hidden'); };
-    mediaRecorder.start(); btnRec.disabled=true; btnStopRec.disabled=false; log('Grabando…');
-  }
+  const mimePref=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm','video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4'].find(t=>window.MediaRecorder?.isTypeSupported?.(t))||'';
+  function startRec(){ if(!stream) return; try{ mediaRecorder=new MediaRecorder(stream, mimePref?{mimeType:mimePref}:{}) }catch(e){ log('MediaRecorder: '+e.message,'error'); return; } chunks=[]; mediaRecorder.ondataavailable=e=>{ if(e.data?.size) chunks.push(e.data); }; mediaRecorder.onstop=()=>{ const blob=new Blob(chunks,{type:mediaRecorder.mimeType||'video/webm'}); const url=URL.createObjectURL(blob); dlLink.href=url; dlLink.download=`grab_${Date.now()}.${mediaRecorder.mimeType?.includes('mp4')?'mp4':'webm'}`; dlLink.classList.remove('hidden'); }; mediaRecorder.start(); btnRec.disabled=true; btnStopRec.disabled=false; log('Grabando…'); }
   function stopRec(){ if(mediaRecorder && mediaRecorder.state!=='inactive') mediaRecorder.stop(); btnStopRec.disabled=true; btnRec.disabled=false; log('Grabación detenida.'); }
+  btnRec.addEventListener('click', startRec);
+  btnStopRec.addEventListener('click', stopRec);
 
   // Mover
   const step=()=>Number(mvSpeed.value)||12;
@@ -407,27 +359,9 @@
   mvReset.addEventListener('click', resetView);
   mvX.addEventListener('change', ()=>{ css.x=Number(mvX.value)||0; applyCss(); });
   mvY.addEventListener('change', ()=>{ css.y=Number(mvY.value)||0; applyCss(); });
-
-  // Zoom input
   rngZoom.addEventListener('input', e=> applyZoom(Number(e.target.value)));
 
-  // Botones básicos
-  btnStart.addEventListener('click', async()=>{ await permCheck(); await startCam(); });
-  btnStop.addEventListener('click', stopCam);
-  btnSwitch.addEventListener('click', async()=>{ const d=await listDevices(); if(!d.length) return; const idx=Math.max(0, d.findIndex(v=>v.deviceId===selDevice.value)); const next=d[(idx+1)%d.length]; selDevice.value=next.deviceId; startCam(); });
-  selDevice.addEventListener('change', ()=> startCam());
-  selFacing.addEventListener('change', ()=> startCam());
-  selFps.addEventListener('change', ()=> startCam());
-  selRes.addEventListener('change', ()=> startCam());
-  btnFS.addEventListener('click', ()=>{ if(!document.fullscreenElement) document.documentElement.requestFullscreen?.(); else document.exitFullscreen?.(); });
-  btnWake.addEventListener('click', async()=>{ try{ if(!wakeLock) { wakeLock=await navigator.wakeLock.request('screen'); btnWake.textContent='🔓 Pantalla encendida (ON)'; wakeLock.addEventListener('release',()=>{wakeLock=null; btnWake.textContent='🔒 Mantener pantalla encendida';}); } else { await wakeLock.release(); } }catch(e){ log('WakeLock error: '+e.message,'error'); } });
-  btnRec.addEventListener('click', startRec);
-  btnStopRec.addEventListener('click', stopRec);
-
-  // Estado inicial
-  updateSecureTag(); permCheck(); listDevices();
-
-  // --------- TESTS ----------
+  // ---------- Tests ----------
   $('#btnTests').addEventListener('click', async ()=>{
     const lines=[];
     lines.push(`${isSecure()?'✅':'❌'} Contexto seguro`);
@@ -437,106 +371,127 @@
     tlog.textContent = lines.join('\n');
   });
   $('#btnTestMove').addEventListener('click', ()=>{
-    const before = preview.style.transform;
-    css.x+=5; applyCss();
-    const after = preview.style.transform;
-    tlog.textContent += `\n${before!==after?'✅':'❌'} Mover modificó transform`;
-    tlog.scrollTop=tlog.scrollHeight;
+    const before=preview.style.transform; css.x+=5; applyCss(); const after=preview.style.transform;
+    tlog.textContent += `\n${before!==after?'✅':'❌'} Mover modificó transform`; tlog.scrollTop=tlog.scrollHeight;
   });
 
-  // =======================
-  //  STREAMING P2P (manual)
-  // =======================
-  const roleSel=$('#role'), wsStart=$('#wsStart');
+  // ==============
+  //  WebRTC (P2P)
+  // ==============
+  const roleSel=$('#role'), wsStart=$('#wsStart'), wsReset=$('#wsReset');
   const bUI=$('#broadcasterUI'), vUI=$('#viewerUI');
   const offerOut=$('#offerOut'), answerIn=$('#answerIn');
   const offerIn=$('#offerIn'), answerOut=$('#answerOut');
   const btnCreateOffer=$('#btnCreateOffer'), btnCopyOffer=$('#btnCopyOffer'), btnApplyAnswer=$('#btnApplyAnswer');
   const btnCreateAnswer=$('#btnCreateAnswer'), btnCopyAnswer=$('#btnCopyAnswer');
   const remoteVideo=$('#remoteVideo');
-  const rUp=$('#rUp'), rDown=$('#rDown'), rLeft=$('#rLeft'), rRight=$('#rRight'), rReset=$('#rReset'), rZoom=$('#rZoom');
+  const rUp=$('#rUp'), rDown=$('#rDown'), rLeft=$('#rLeft'), rRight=$('#rRight'), rResetBtn=$('#rReset'), rZoom=$('#rZoom');
+  const sigState=$('#sigState'), iceState=$('#iceState'), gathState=$('#gathState'), connState=$('#connState');
+  const broadHint=$('#broadHint');
 
-  let pc=null, ctrl=null; // DataChannel cuando soy broadcaster; cuando soy viewer, se recibe
+  let pc=null, ctrl=null;
 
   function pcConfig(){ return { iceServers:[{urls:'stun:stun.l.google.com:19302'}] }; }
+  function updateStates(){ if(!pc){ sigState.textContent=iceState.textContent=gathState.textContent=connState.textContent='—'; return; }
+    sigState.textContent=pc.signalingState; iceState.textContent=pc.iceConnectionState; gathState.textContent=pc.iceGatheringState; connState.textContent=pc.connectionState; }
+  function showRoleUI(){ const r=roleSel.value; bUI.classList.toggle('hidden', r!=='broadcaster'); vUI.classList.toggle('hidden', r!=='viewer'); remoteVideo.classList.toggle('hidden', r!=='viewer'); }
+  roleSel.addEventListener('change', showRoleUI); showRoleUI();
 
-  function showRoleUI(){
-    const r = roleSel.value;
-    bUI.classList.toggle('hidden', r!=='broadcaster');
-    vUI.classList.toggle('hidden', r!=='viewer');
-    remoteVideo.classList.toggle('hidden', r!=='viewer');
+  function resetPC(){
+    if(pc){ try{pc.ontrack=pc.ondatachannel=null; pc.close();}catch{} }
+    pc=null; ctrl=null;
+    updateStates();
+    // reset UI
+    btnCreateOffer.disabled=true; btnCopyOffer.disabled=true; btnApplyAnswer.disabled=true;
+    btnCreateAnswer.disabled=true; btnCopyAnswer.disabled=true;
+    wsReset.disabled=true;
+    offerOut.value=''; answerIn.value=''; offerIn.value=''; answerOut.value='';
+    broadHint.textContent='';
   }
-  showRoleUI();
-  roleSel.addEventListener('change', showRoleUI);
 
   wsStart.addEventListener('click', ()=>{
-    if (pc) { try{pc.close();}catch{} pc=null; }
+    resetPC();
     pc = new RTCPeerConnection(pcConfig());
+    wsReset.disabled=false;
+    pc.oniceconnectionstatechange=updateStates;
+    pc.onicegatheringstatechange=updateStates;
+    pc.onsignalingstatechange=updateStates;
+    pc.onconnectionstatechange=updateStates;
+    updateStates();
     log('RTCPeerConnection creada.');
     if(roleSel.value==='broadcaster'){
       if(!stream){ log('Iniciá la cámara antes de transmitir.','error'); return; }
       stream.getTracks().forEach(t=> pc.addTrack(t, stream));
-      // DataChannel para control remoto
       ctrl = pc.createDataChannel('ctrl');
       ctrl.onopen = ()=> log('Canal de control abierto.');
-      ctrl.onmessage = (ev)=> {
-        try{
-          const msg = JSON.parse(ev.data);
-          if(msg.t==='nudge'){ nudge(msg.dx, msg.dy); }
-          if(msg.t==='zoom'){ applyZoom(msg.z); }
-          if(msg.t==='reset'){ resetView(); }
-        }catch{}
-      };
+      ctrl.onmessage = (ev)=> { try{ const msg=JSON.parse(ev.data); if(msg.t==='nudge') nudge(msg.dx,msg.dy); if(msg.t==='zoom') applyZoom(msg.z); if(msg.t==='reset') resetView(); }catch{} };
+      btnCreateOffer.disabled=false;
+      broadHint.textContent='Esperando que crees una oferta…';
     } else {
       pc.ontrack = (ev)=>{ remoteVideo.srcObject = ev.streams[0]; };
       pc.ondatachannel = (ev)=> { ctrl = ev.channel; log('Canal de control listo (viewer).'); };
-      // Recibir solo video
-      pc.addTransceiver('video', { direction:'recvonly' });
+      pc.addTransceiver('video',{direction:'recvonly'});
+      btnCreateAnswer.disabled=false; // se habilita al pegar oferta válida
     }
-    pc.onicecandidate = (e)=> { /* los ICE se embeben en el SDP automáticamente */ };
   });
 
-  // Broadcaster: crear oferta
+  wsReset.addEventListener('click', resetPC);
+
+  // Broadcaster: crear oferta (y esperar ICE)
   btnCreateOffer.addEventListener('click', async ()=>{
     if(!pc){ log('Primero “Iniciar conexión”.','error'); return; }
-    const offer = await pc.createOffer({offerToReceiveAudio:false, offerToReceiveVideo:false});
-    await pc.setLocalDescription(offer);
-    offerOut.value = JSON.stringify(pc.localDescription);
-    log('Oferta creada. Copiala a la PC.');
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer); // signaling: have-local-offer
+    updateStates();
+    broadHint.textContent='Creando oferta… recolectando ICE…';
+    await waitIceComplete(pc);
+    offerOut.value = JSON.stringify(pc.localDescription); // incluye candidates (no trickle)
+    btnCopyOffer.disabled=false;
+    btnApplyAnswer.disabled=false; // se permitirá aplicar answer sólo si estado correcto
+    broadHint.textContent='ICE listo. Copiá la oferta a la PC.';
   });
   btnCopyOffer.addEventListener('click', ()=>{ offerOut.select(); document.execCommand('copy'); });
 
-  // Broadcaster: aplicar answer
+  // Broadcaster: aplicar answer (validando estado y tipo)
   btnApplyAnswer.addEventListener('click', async ()=>{
     if(!pc){ log('Primero “Iniciar conexión”.','error'); return; }
-    try{
-      const ans = JSON.parse(answerIn.value);
-      await pc.setRemoteDescription(ans);
-      log('Respuesta aplicada. Conectado (P2P).');
-    }catch(e){ log('Error aplicando respuesta: '+e.message,'error'); }
+    if(pc.signalingState!=='have-local-offer'){ log(`No hay offer pendiente (estado: ${pc.signalingState}). Volvé a crear la oferta.`,'error'); return; }
+    let ans;
+    try{ ans=JSON.parse(answerIn.value); }catch{ log('Respuesta inválida (no es JSON).','error'); return; }
+    if(!ans || ans.type!=='answer'){ log(`Esperaba una "answer", pero recibí: ${ans?.type||'desconocido'}`,'error'); return; }
+    if(!ans.sdp){ log('La answer no tiene SDP.','error'); return; }
+    try{ await pc.setRemoteDescription(ans); updateStates(); log('Respuesta aplicada. Conectado.'); }
+    catch(e){ log('Error aplicando respuesta: '+e.message,'error'); }
   });
 
   // Viewer: crear answer
   btnCreateAnswer.addEventListener('click', async ()=>{
     if(!pc){ log('Primero “Iniciar conexión”.','error'); return; }
+    let off;
+    try{ off=JSON.parse(offerIn.value); }catch{ log('Oferta inválida (no es JSON).','error'); return; }
+    if(!off || off.type!=='offer'){ log(`Esperaba una "offer", pero recibí: ${off?.type||'desconocido'}`,'error'); return; }
+    if(!off.sdp){ log('La offer no tiene SDP.','error'); return; }
     try{
-      const off = JSON.parse(offerIn.value);
-      await pc.setRemoteDescription(off);
+      await pc.setRemoteDescription(off); // signaling: have-remote-offer
       const ans = await pc.createAnswer();
       await pc.setLocalDescription(ans);
+      updateStates();
+      // esperar ICE gathering complete para dar una answer “completa”
+      await waitIceComplete(pc);
       answerOut.value = JSON.stringify(pc.localDescription);
-      log('Respuesta creada. Copiala al celu.');
+      btnCopyAnswer.disabled=false;
+      log('Respuesta lista. Copiala al celu.');
     }catch(e){ log('Error creando respuesta: '+e.message,'error'); }
   });
   btnCopyAnswer.addEventListener('click', ()=>{ answerOut.select(); document.execCommand('copy'); });
 
-  // Controles remotos desde la PC (viewer -> broadcaster)
+  // Controles remotos (Viewer -> Broadcaster)
   function sendCtrl(obj){ if(ctrl && ctrl.readyState==='open'){ ctrl.send(JSON.stringify(obj)); } }
   rUp.addEventListener('click', ()=> sendCtrl({t:'nudge', dx:0, dy:- (Number(mvSpeed.value)||12)}));
   rDown.addEventListener('click', ()=> sendCtrl({t:'nudge', dx:0, dy: (Number(mvSpeed.value)||12)}));
   rLeft.addEventListener('click', ()=> sendCtrl({t:'nudge', dx:- (Number(mvSpeed.value)||12), dy:0}));
   rRight.addEventListener('click', ()=> sendCtrl({t:'nudge', dx: (Number(mvSpeed.value)||12), dy:0}));
-  rReset.addEventListener('click', ()=> sendCtrl({t:'reset'}));
+  rResetBtn.addEventListener('click', ()=> sendCtrl({t:'reset'}));
   rZoom.addEventListener('input', e=> sendCtrl({t:'zoom', z:Number(e.target.value)}));
 
 })();

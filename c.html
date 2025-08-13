@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Control de cámara @ 60fps</title>
+<style>
+  :root { --bg:#0b0d10; --fg:#e8eef6; --muted:#9fb3c8; --acc:#5cc8ff; --bad:#ff6b6b; --ok:#69db7c; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:var(--bg); color:var(--fg); }
+  header { padding: 1rem; border-bottom:1px solid #1d2530; display:flex; gap:.75rem; align-items:center; flex-wrap:wrap; }
+  header h1 { font-size: clamp(16px, 2.5vw, 20px); margin:0; font-weight:600; }
+  header .pill { font-size:.85rem; color:var(--muted); }
+  main { display:grid; grid-template-columns: 1fr 360px; gap:1rem; padding:1rem; }
+  @media (max-width: 980px) { main { grid-template-columns: 1fr; } }
+  .panel { background:#0f1217; border:1px solid #1d2530; border-radius:12px; overflow:hidden; }
+  .panel h2 { margin:0; padding:.8rem 1rem; border-bottom:1px solid #1d2530; font-size:1rem; color:#c7d5e0; }
+  .panel .content { padding:1rem; }
+  video { width:100%; aspect-ratio: 16 / 9; background:#000; transform-origin:center; touch-action: pinch-zoom; }
+  .controls { display:grid; gap:.5rem; }
+  .row { display:flex; gap:.5rem; flex-wrap:wrap; }
+  button, select, input[type="range"] {
+    background:#11161f; color:var(--fg); border:1px solid #283042; border-radius:10px; padding:.6rem .8rem;
+    font: inherit;
+  }
+  button:hover { border-color:#3a4a66; }
+  button.primary { background:#122338; border-color:#23476b; }
+  button.danger { border-color:#5b2a2a; background:#2a1212; }
+  .small { font-size:.85rem; color:var(--muted); }
+  .stat { display:flex; align-items:center; gap:.4rem; }
+  .stat .dot { width:8px; height:8px; border-radius:999px; background:#3a455a; }
+  .stat.ok .dot { background:var(--ok); }
+  .stat.bad .dot { background:var(--bad); }
+  .grid2 { display:grid; grid-template-columns: 1fr 1fr; gap:.5rem; }
+  .log { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:.9rem; background:#0a0c10; border:1px solid #1d2530; padding:.7rem; border-radius:10px; max-height:180px; overflow:auto; white-space:pre-wrap; }
+  .hidden { display:none !important; }
+  .tag { padding:.25rem .5rem; border:1px solid #283042; border-radius:999px; }
+  .pass { color: var(--ok); }
+  .fail { color: var(--bad); }
+  footer { padding:1rem; color:var(--muted); font-size:.9rem; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Control de cámara (intenta 1080p @ 60 fps)</h1>
+    <span id="secureState" class="pill tag">HTTPS: …</span>
+    <span id="permState" class="pill tag">Permiso cámara: …</span>
+    <span id="deviceState" class="pill tag">Dispositivos: …</span>
+  </header>
+
+  <main>
+    <section class="panel">
+      <h2>Vista</h2>
+      <div class="content">
+        <video id="preview" playsinline autoplay muted></video>
+        <div class="row" style="margin-top:.6rem">
+          <div class="stat" id="fpsStat"><span class="dot"></span><span id="fpsText">FPS: —</span></div>
+          <div class="stat" id="resStat"><span class="dot"></span><span id="resText">Resolución: —</span></div>
+          <div class="stat" id="zoomStat"><span class="dot"></span><span id="zoomText">Zoom: —</span></div>
+          <div class="stat" id="torchStat"><span class="dot"></span><span id="torchText">Torch: —</span></div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <h2>Controles</h2>
+      <div class="content controls">
+        <div class="row">
+          <button id="btnStart" class="primary">🎥 Iniciar cámara</button>
+          <button id="btnStop" class="danger" disabled>⏹️ Detener</button>
+          <button id="btnFullscreen">⛶ Pantalla completa</button>
+        </div>
+
+        <div class="grid2">
+          <label>FPS deseados
+            <select id="selFps">
+              <option value="60" selected>60</option>
+              <option value="30">30</option>
+              <option value="24">24</option>
+            </select>
+          </label>
+          <label>Resolución
+            <select id="selRes">
+              <option value="1920x1080" selected>1080p</option>
+              <option value="1280x720">720p</option>
+              <option value="640x480">480p</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="grid2">
+          <label>Cámara
+            <select id="selDevice"></select>
+          </label>
+          <label>Foco cámara
+            <select id="selFacing">
+              <option value="environment" selected>Trasera</option>
+              <option value="user">Frontal</option>
+            </select>
+          </label>
+        </div>
+
+        <label>Zoom
+          <input id="rangeZoom" type="range" min="1" max="1" step="0.01" value="1" disabled />
+        </label>
+
+        <div class="row">
+          <button id="btnTorch" disabled>💡 Torch</button>
+          <button id="btnWake">🔒 Mantener pantalla encendida</button>
+          <button id="btnSwitch">🔄 Cambiar cámara</button>
+        </div>
+
+        <div class="row">
+          <button id="btnRec" disabled>⏺️ Grabar</button>
+          <button id="btnStopRec" class="danger" disabled>⬛ Detener grabación</button>
+          <a id="dlLink" class="hidden" download="grabacion.webm">⬇️ Descargar</a>
+        </div>
+
+        <details>
+          <summary>Diagnóstico / Tests</summary>
+          <div class="small">Ejecuta pruebas para detectar problemas típicos (HTTPS, permisos, APIs, enumeración…)</div>
+          <div class="row" style="margin-top:.5rem">
+            <button id="btnRunTests">▶️ Correr tests</button>
+          </div>
+          <div id="testResults" class="log" aria-live="polite"></div>
+        </details>
+
+        <div id="messages" class="log" style="margin-top:.5rem"></div>
+        <div class="small">
+          <strong>Tips si ves “NotAllowedError”:</strong>
+          1) Asegurate de usar <u>HTTPS</u> o <u>localhost</u>. 2) Toca “Iniciar cámara” y cuando el navegador pregunte, elegí <u>Permitir</u>. 3) Si alguna vez pusiste “Bloquear”, abrí la configuración del sitio y reseteá permisos.
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <footer>
+    Si tu equipo no soporta zoom nativo o torch, la app usa alternativas (zoom de previsualización por pellizco/slide).
+  </footer>
+
+<script>
+(() => {
+  const $ = sel => document.querySelector(sel);
+  const log = (msg, type='info') => {
+    const el = $('#messages');
+    const ts = new Date().toLocaleTimeString();
+    el.textContent += `[${ts}] ${msg}\n`;
+    el.scrollTop = el.scrollHeight;
+    console[type === 'error' ? 'error' : 'log'](msg);
+  };
+
+  const preview = $('#preview');
+  const btnStart = $('#btnStart');
+  const btnStop = $('#btnStop');
+  const btnFullscreen = $('#btnFullscreen');
+  const btnWake = $('#btnWake');
+  const btnSwitch = $('#btnSwitch');
+  const selFps = $('#selFps');
+  const selRes = $('#selRes');
+  const selDevice = $('#selDevice');
+  const selFacing = $('#selFacing');
+  const rangeZoom = $('#rangeZoom');
+  const btnTorch = $('#btnTorch');
+  const btnRec = $('#btnRec');
+  const btnStopRec = $('#btnStopRec');
+  const dlLink = $('#dlLink');
+
+  const secureState = $('#secureState');
+  const permState = $('#permState');
+  const deviceState = $('#deviceState');
+
+  const fpsText = $('#fpsText'), fpsStat = $('#fpsStat');
+  const resText = $('#resText'), resStat = $('#resStat');
+  const zoomText = $('#zoomText'), zoomStat = $('#zoomStat');
+  const torchText = $('#torchText'), torchStat = $('#torchStat');
+
+  let stream = null;
+  let mediaTrack = null;
+  let mediaRecorder = null;
+  let chunks = [];
+  let wakeLock = null;
+  let rafId = null;
+  let cssZoom = 1, cssOffset = {x:0,y:0};
+  let pinch = {active:false, startDist:0, startZoom:1};
+
+  // ---------- Utilidades / helpers ----------
+  const clamp = (v,min,max)=>Math.min(max,Math.max(min,v));
+  const supportedMime = (() => {
+    const types = [
+      'video/webm;codecs=vp9,opus',
+      'video/webm;codecs=vp8,opus',
+      'video/webm',
+      'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+      'video/mp4'
+    ];
+    return types.find(t => MediaRecorder.isTypeSupported?.(t)) || '';
+  })();
+
+  function isSecure() {
+    const ok = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+    secureState.textContent = `HTTPS: ${ok ? 'sí' : 'no'}`;
+    secureState.style.borderColor = ok ? '#294d34' : '#5b2a2a';
+    return ok;
+  }
+
+  async function getPermissionState() {
+    try {
+      if (!('permissions' in navigator)) throw new Error('Permissions API no disponible');
+      // "camera" no es estándar en todos; algunos navegadores usan "camera", otros no exponen
+      const q = await navigator.permissions.query({ name: 'camera' });
+      permState.textContent = `Permiso cámara: ${q.state}`;
+      return q.state;
+    } catch {
+      // Sin Permissions API: estado desconocido hasta intentar getUserMedia
+      permState.textContent = 'Permiso cámara: (desconocido)';
+      return 'prompt';
+    }
+  }
+
+  async function listDevices() {
+    try {
+      const list = await navigator.mediaDevices.enumerateDevices();
+      const vids = list.filter(d => d.kind === 'videoinput');
+      selDevice.innerHTML = '';
+      vids.forEach((d, i) => {
+        const opt = document.createElement('option');
+        opt.value = d.deviceId;
+        opt.textContent = d.label || `Cámara ${i+1}`;
+        selDevice.appendChild(opt);
+      });
+      deviceState.textContent = `Dispositivos: ${vids.length}`;
+      return vids;
+    } catch (e) {
+      deviceState.textContent = `Dispositivos: error`;
+      log('No se pudieron enumerar dispositivos: ' + e.message, 'error');
+      return [];
+    }
+  }
+
+  function parseRes(value) {
+    const [w,h] = value.split('x').map(Number);
+    return { width:w, height:h };
+  }
+
+  function buildConstraints() {
+    const fps = Number(selFps.value);
+    const { width, height } = parseRes(selRes.value);
+    const facing = selFacing.value;
+    const deviceId = selDevice.value || undefined;
+    const video = {
+      width: { ideal: width }, height: { ideal: height },
+      frameRate: { ideal: fps, max: fps },
+      facingMode: deviceId ? undefined : ({ ideal: facing }),
+      deviceId: deviceId ? ({ exact: deviceId }) : undefined,
+      // PTZ props se establecen dinámicamente con applyConstraints si existen
+    };
+    return { audio: false, video };
+  }
+
+  async function applyZoom(v) {
+    if (!mediaTrack) return;
+    const caps = mediaTrack.getCapabilities?.() || {};
+    const settings = mediaTrack.getSettings?.() || {};
+    if ('zoom' in caps) {
+      const min = caps.zoom.min ?? 1;
+      const max = caps.zoom.max ?? 10;
+      const nv = clamp(v, min, max);
+      await mediaTrack.applyConstraints({ advanced: [{ zoom: nv }] });
+      rangeZoom.value = nv;
+      rangeZoom.min = min; rangeZoom.max = max; rangeZoom.step = 0.01;
+      zoomText.textContent = `Zoom: nativo x${nv.toFixed(2)}`;
+      zoomStat.classList.add('ok');
+    } else {
+      // zoom de previsualización (CSS) — no afecta a la grabación
+      cssZoom = clamp(v, 1, 8);
+      updateCssTransform();
+      rangeZoom.value = cssZoom; rangeZoom.min = 1; rangeZoom.max = 8; rangeZoom.step = 0.01;
+      zoomText.textContent = `Zoom (vista) x${cssZoom.toFixed(2)}`;
+      zoomStat.classList.remove('ok');
+    }
+  }
+
+  function updateCssTransform() {
+    preview.style.transform = `scale(${cssZoom}) translate(${cssOffset.x}px, ${cssOffset.y}px)`;
+  }
+
+  async function toggleTorch() {
+    if (!mediaTrack) return;
+    const caps = mediaTrack.getCapabilities?.() || {};
+    const settings = mediaTrack.getSettings?.() || {};
+    if (!('torch' in caps)) {
+      torchText.textContent = 'Torch: no disponible';
+      torchStat.classList.remove('ok');
+      return;
+    }
+    const cur = settings.torch === true;
+    await mediaTrack.applyConstraints({ advanced: [{ torch: !cur }] });
+    const after = mediaTrack.getSettings().torch === true;
+    btnTorch.textContent = after ? '💡 Torch (ON)' : '💡 Torch';
+    torchText.textContent = `Torch: ${after ? 'ON' : 'OFF'}`;
+    torchStat.classList.add('ok');
+  }
+
+  // ---------- FPS meter ----------
+  function startFpsMeter() {
+    let last = performance.now();
+    let frames = 0;
+    let acc = 0;
+    cancelAnimationFrame(rafId);
+    const tick = t => {
+      frames++;
+      const dt = t - last;
+      if (dt >= 1000) {
+        const fps = (frames * 1000) / dt;
+        fpsText.textContent = `FPS: ${fps.toFixed(1)}`;
+        fpsStat.classList.toggle('ok', fps >= (Number(selFps.value) - 5));
+        frames = 0; last = t;
+      }
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+  }
+  function stopFpsMeter() { cancelAnimationFrame(rafId); }
+
+  // ---------- Cámara ----------
+  async function startCamera(withFallback=true) {
+    if (!isSecure()) {
+      log('⚠️ Debes usar HTTPS o localhost para acceder a la cámara', 'error');
+      return;
+    }
+    try {
+      const constraints = buildConstraints();
+      log('Solicitando cámara con: ' + JSON.stringify(constraints.video));
+      const s = await navigator.mediaDevices.getUserMedia(constraints);
+      onStream(s);
+    } catch (e) {
+      if (e.name === 'NotAllowedError' || e.name === 'SecurityError') {
+        log('Permiso de cámara denegado o bloqueado. Revisá la configuración del sitio y vuelve a intentar.', 'error');
+        permState.textContent = 'Permiso cámara: denied';
+        return;
+      }
+      if (e.name === 'OverconstrainedError' && withFallback) {
+        log(`No pudo con las restricciones pedidas (${e.constraint}). Intentando fallback…`);
+        // Fallback: bajar FPS y resolución progresivamente
+        const order = [
+          { fps: 60, res: '1280x720' },
+          { fps: 30, res: '1920x1080' },
+          { fps: 30, res: '1280x720' },
+          { fps: 24, res: '1280x720' },
+          { fps: 30, res: '640x480' },
+        ];
+        for (const opt of order) {
+          selFps.value = String(opt.fps);
+          selRes.value = opt.res;
+          try {
+            const s2 = await navigator.mediaDevices.getUserMedia(buildConstraints());
+            log(`Fallback exitoso: ${opt.res} @ ${opt.fps}fps`);
+            onStream(s2);
+            return;
+          } catch {}
+        }
+        log('No se pudo abrir la cámara con ningún fallback', 'error');
+        return;
+      }
+      log(`Error al abrir la cámara: ${e.name}: ${e.message}`, 'error');
+    }
+  }
+
+  function onStream(s) {
+    stopFpsMeter();
+    if (stream) stopCamera();
+    stream = s;
+    preview.srcObject = stream;
+    mediaTrack = stream.getVideoTracks()[0];
+    btnStop.disabled = false;
+    btnRec.disabled = false;
+    btnTorch.disabled = false;
+    rangeZoom.disabled = false;
+
+    // Actualizar settings/capabilities
+    const caps = mediaTrack.getCapabilities?.() || {};
+    const sets = mediaTrack.getSettings?.() || {};
+    resText.textContent = `Resolución: ${sets.width || '—'}x${sets.height || '—'} @ ${sets.frameRate || '—'}fps`;
+    resStat.classList.add('ok');
+
+    // Config zoom UI
+    if ('zoom' in caps) {
+      rangeZoom.min = caps.zoom.min ?? 1;
+      rangeZoom.max = caps.zoom.max ?? 10;
+      rangeZoom.step = 0.01;
+      rangeZoom.value = sets.zoom ?? 1;
+      zoomText.textContent = `Zoom: nativo x${(sets.zoom ?? 1).toFixed(2)}`;
+      zoomStat.classList.add('ok');
+    } else {
+      rangeZoom.min = 1; rangeZoom.max = 8; rangeZoom.step = 0.01; rangeZoom.value = 1;
+      zoomText.textContent = `Zoom (vista) x1.00`;
+      zoomStat.classList.remove('ok');
+    }
+
+    if (('torch' in caps)) {
+      torchText.textContent = `Torch: ${sets.torch ? 'ON' : 'OFF'}`;
+      btnTorch.disabled = false;
+    } else {
+      torchText.textContent = 'Torch: no disponible';
+      btnTorch.disabled = true;
+    }
+
+    // Refrescar lista de dispositivos (ya con labels)
+    listDevices().then(() => {
+      // Seleccionar el device activo si coincide
+      const id = mediaTrack.getSettings?.().deviceId;
+      if (id) selDevice.value = id;
+    });
+
+    startFpsMeter();
+  }
+
+  function stopCamera() {
+    stopFpsMeter();
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      try { mediaRecorder.stop(); } catch {}
+    }
+    if (stream) {
+      stream.getTracks().forEach(t => t.stop());
+    }
+    stream = null; mediaTrack = null;
+    preview.srcObject = null;
+    btnStop.disabled = true;
+    btnRec.disabled = true;
+    btnStopRec.disabled = true;
+    btnTorch.disabled = true;
+    rangeZoom.disabled = true;
+  }
+
+  // ---------- Grabación ----------
+  function startRec() {
+    if (!stream) return;
+    chunks = [];
+    try {
+      mediaRecorder = new MediaRecorder(stream, supportedMime ? { mimeType: supportedMime } : undefined);
+    } catch (e) {
+      log('MediaRecorder no soportado: ' + e.message, 'error');
+      return;
+    }
+    mediaRecorder.ondataavailable = ev => { if (ev.data && ev.data.size) chunks.push(ev.data); };
+    mediaRecorder.onstop = () => {
+      const blob = new Blob(chunks, { type: mediaRecorder.mimeType || 'video/webm' });
+      const url = URL.createObjectURL(blob);
+      dlLink.href = url;
+      dlLink.classList.remove('hidden');
+      dlLink.setAttribute('download', `grabacion_${Date.now()}.${mediaRecorder.mimeType?.includes('mp4')?'mp4':'webm'}`);
+    };
+    mediaRecorder.start();
+    btnRec.disabled = true;
+    btnStopRec.disabled = false;
+    log('Grabación iniciada.');
+  }
+  function stopRec() {
+    if (!mediaRecorder) return;
+    mediaRecorder.stop();
+    btnStopRec.disabled = true;
+    btnRec.disabled = false;
+    log('Grabación detenida.');
+  }
+
+  // ---------- Gestos: zoom por pellizco / arrastre ----------
+  function dist(t1, t2) {
+    const dx = t1.clientX - t2.clientX;
+    const dy = t1.clientY - t2.clientY;
+    return Math.hypot(dx,dy);
+  }
+  preview.addEventListener('touchstart', e => {
+    if (e.touches.length === 2) {
+      pinch.active = true;
+      pinch.startDist = dist(e.touches[0], e.touches[1]);
+      pinch.startZoom = Number(rangeZoom.value || 1);
+    }
+  }, {passive:true});
+  preview.addEventListener('touchmove', e => {
+    if (pinch.active && e.touches.length === 2) {
+      const d = dist(e.touches[0], e.touches[1]);
+      const factor = d / (pinch.startDist || d);
+      applyZoom(pinch.startZoom * factor);
+    }
+  }, {passive:true});
+  preview.addEventListener('touchend', e => { if (e.touches.length < 2) pinch.active = false; });
+
+  // Arrastre para “mover” vista cuando hay zoom CSS
+  let drag = {active:false, startX:0, startY:0, baseX:0, baseY:0};
+  preview.addEventListener('pointerdown', e => {
+    drag.active = true; drag.startX = e.clientX; drag.startY = e.clientY; drag.baseX = cssOffset.x; drag.baseY = cssOffset.y;
+  });
+  window.addEventListener('pointerup', ()=> drag.active=false);
+  window.addEventListener('pointermove', e => {
+    if (!drag.active) return;
+    cssOffset.x = drag.baseX + (e.clientX - drag.startX) / 100;
+    cssOffset.y = drag.baseY + (e.clientY - drag.startY) / 100;
+    updateCssTransform();
+  });
+
+  // ---------- Wake Lock / Fullscreen ----------
+  async function toggleWake() {
+    if ('wakeLock' in navigator) {
+      if (!wakeLock) {
+        try { wakeLock = await navigator.wakeLock.request('screen'); btnWake.textContent='🔓 Pantalla encendida (ON)'; }
+        catch(e){ log('No se pudo activar WakeLock: ' + e.message, 'error'); }
+      } else {
+        try { await wakeLock.release(); } catch {}
+        wakeLock = null; btnWake.textContent='🔒 Mantener pantalla encendida';
+      }
+    } else {
+      log('Wake Lock no soportado. Subí brillo/tiempo de pantalla manualmente.');
+    }
+  }
+
+  function toggleFullscreen() {
+    const el = document.fullscreenElement ? document : document.documentElement;
+    if (document.fullscreenElement) document.exitFullscreen();
+    else document.documentElement.requestFullscreen?.();
+  }
+
+  // ---------- Eventos UI ----------
+  btnStart.addEventListener('click', async () => {
+    await getPermissionState(); // refrescar indicador
+    await startCamera(true);
+  });
+  btnStop.addEventListener('click', stopCamera);
+  btnSwitch.addEventListener('click', async () => {
+    const vids = await listDevices();
+    if (!vids.length) return;
+    const idx = Math.max(0, vids.findIndex(v => v.deviceId === selDevice.value));
+    const next = vids[(idx+1) % vids.length];
+    selDevice.value = next.deviceId;
+    startCamera(false);
+  });
+  selDevice.addEventListener('change', ()=> startCamera(false));
+  selFacing.addEventListener('change', ()=> startCamera(false));
+  selFps.addEventListener('change', ()=> startCamera(false));
+  selRes.addEventListener('change', ()=> startCamera(false));
+  rangeZoom.addEventListener('input', e => applyZoom(Number(e.target.value)));
+  btnTorch.addEventListener('click', toggleTorch);
+  btnRec.addEventListener('click', startRec);
+  btnStopRec.addEventListener('click', stopRec);
+  btnWake.addEventListener('click', toggleWake);
+  btnFullscreen.addEventListener('click', toggleFullscreen);
+
+  // ---------- Tests embebidos (auto-diagnóstico) ----------
+  const tests = [
+    {
+      name: 'Contexto seguro (HTTPS/localhost)',
+      run: () => isSecure()
+    },
+    {
+      name: 'APIs disponibles: mediaDevices/getUserMedia',
+      run: () => !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)
+    },
+    {
+      name: 'Permissions API (opcional)',
+      run: () => 'permissions' in navigator
+    },
+    {
+      name: 'Enumeración de dispositivos',
+      run: async () => {
+        try { const d = await navigator.mediaDevices.enumerateDevices(); return Array.isArray(d); }
+        catch { return false; }
+      }
+    },
+    {
+      name: 'Intento de abrir cámara (sin forzar 60fps)',
+      run: async () => {
+        // Hacer una prueba suave a 30fps/720p para no fallar por sobre-restricción
+        const c = { video: { width: {ideal: 1280}, height:{ideal:720}, frameRate:{ideal:30} }, audio:false };
+        try {
+          const s = await navigator.mediaDevices.getUserMedia(c);
+          s.getTracks().forEach(t=>t.stop());
+          return true;
+        } catch { return false; }
+      }
+    }
+  ];
+
+  $('#btnRunTests').addEventListener('click', async () => {
+    const out = $('#testResults');
+    out.textContent = '';
+    for (const t of tests) {
+      try {
+        const r = await t.run();
+        out.textContent += `${r ? '✅' : '❌'} ${t.name}\n`;
+      } catch (e) {
+        out.textContent += `❌ ${t.name} (error: ${e.message})\n`;
+      }
+    }
+    out.scrollTop = out.scrollHeight;
+  });
+
+  // Estado inicial
+  isSecure();
+  getPermissionState();
+  listDevices();
+
+})();
+</script>
+</body>
+</html>
